@@ -8,7 +8,7 @@ on:
 
 env:
   NODE_VERSION: '18'
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
 jobs:
   verify:
@@ -75,7 +75,7 @@ jobs:
       - name: Run OpenAI integration tests
         run: npm run test:openai
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 
       - name: Run error handling tests
         run: npm run test:errors

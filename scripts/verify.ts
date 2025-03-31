@@ -57,11 +57,16 @@ async function runVerification() {
   ];
 
   for (const envVar of requiredEnvVars) {
-    const exists = process.env[envVar] || (process.env.CI && envVar === 'NODE_ENV' ? 'production' : undefined);
+    let exists = process.env[envVar];
+    if (process.env.CI) {
+      // In CI, check if the variable is explicitly set (as GitHub Secret)
+      exists = exists !== undefined ? exists :
+              (envVar === 'NODE_ENV' ? 'production' : undefined);
+    }
     results.push({
       name: `Environment Variable: ${envVar}`,
       status: exists ? 'pass' : 'fail',
-      message: exists ? undefined : `Missing environment variable (${process.env.CI ? 'GitHub Secrets' : '.env'})`
+      message: exists ? undefined : `Missing ${process.env.CI ? 'GitHub Secret' : '.env variable'}: ${envVar}`
     });
   }
 

@@ -2,8 +2,8 @@ import { OpenAI } from 'openai';
 import { Analysis } from '../types';
 import { ConfigurationError, handleOpenAIError, formatError } from './errors';
 
-// Initialize OpenAI client
-const apiKey = process.env.OPENAI_API_KEY;
+// Initialize Deepseek client
+const apiKey = process.env.DEEPSEEK_API_KEY;
 
 console.log('OpenAI API Key from env:', apiKey ? '***' + apiKey.slice(-4) : 'NOT FOUND');
 

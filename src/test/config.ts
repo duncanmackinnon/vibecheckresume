@@ -116,19 +116,19 @@ export const testEnvVars = {
   development: {
     NODE_ENV: 'development',
     NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-    OPENAI_API_KEY: 'sk-test123',
+    DEEPSEEK_API_KEY: 'test123',
     RATE_LIMIT: '10'
   },
   test: {
     NODE_ENV: 'test',
     NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-    OPENAI_API_KEY: 'sk-test123',
+    DEEPSEEK_API_KEY: 'test123',
     RATE_LIMIT: '10'
   },
   production: {
     NODE_ENV: 'production',
     NEXT_PUBLIC_APP_URL: 'https://example.com',
-    OPENAI_API_KEY: 'sk-test123',
+    DEEPSEEK_API_KEY: 'test123',
     RATE_LIMIT: '10'
   }
 };

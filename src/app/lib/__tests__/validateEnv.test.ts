@@ -10,7 +10,7 @@ describe('Environment Validation', () => {
     mockEnv = {
       NODE_ENV: 'test',
       NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-      OPENAI_API_KEY: 'sk-test123',
+      DEEPSEEK_API_KEY: 'test123',
       RATE_LIMIT: '10',
       DB_HOST: 'localhost',
       DB_PORT: '5432',
@@ -36,25 +36,25 @@ describe('Environment Validation', () => {
     });
 
     it('should detect missing required variables', () => {
-      mockEnv.OPENAI_API_KEY = undefined;
+      mockEnv.DEEPSEEK_API_KEY = undefined;
       mockEnv.DB_HOST = undefined;
 
       const result = validateEnvironment();
       expect(result.isValid).toBe(false);
       expect(result.errors).toContainEqual({
         type: 'missing',
-        variables: ['OPENAI_API_KEY', 'DB_HOST']
+        variables: ['DEEPSEEK_API_KEY', 'DB_HOST']
       } satisfies ValidationError);
     });
 
     it('should validate OpenAI API key format', () => {
-      mockEnv.OPENAI_API_KEY = 'invalid-key';
+      mockEnv.DEEPSEEK_API_KEY = 'invalid-key';
 
       const result = validateEnvironment();
       expect(result.isValid).toBe(false);
       expect(result.errors).toContainEqual({
         type: 'invalid',
-        variables: ['OPENAI_API_KEY']
+        variables: ['DEEPSEEK_API_KEY']
       } satisfies ValidationError);
     });
 
@@ -109,11 +109,11 @@ describe('Environment Validation', () => {
     it('should format missing variable errors', () => {
       const errors: ValidationError[] = [{
         type: 'missing',
-        variables: ['OPENAI_API_KEY', 'DB_HOST']
+        variables: ['DEEPSEEK_API_KEY', 'DB_HOST']
       }];
 
       const formatted = formatValidationErrors(errors);
-      expect(formatted).toContain('Missing required environment variables: OPENAI_API_KEY, DB_HOST');
+      expect(formatted).toContain('Missing required environment variables: DEEPSEEK_API_KEY, DB_HOST');
     });
 
     it('should format invalid value errors', () => {
@@ -130,7 +130,7 @@ describe('Environment Validation', () => {
       const errors: ValidationError[] = [
         {
           type: 'missing',
-          variables: ['OPENAI_API_KEY']
+          variables: ['DEEPSEEK_API_KEY']
         },
         {
           type: 'invalid',
@@ -140,7 +140,7 @@ describe('Environment Validation', () => {
 
       const formatted = formatValidationErrors(errors);
       expect(formatted).toHaveLength(2);
-      expect(formatted[0]).toContain('Missing required environment variables: OPENAI_API_KEY');
+      expect(formatted[0]).toContain('Missing required environment variables: DEEPSEEK_API_KEY');
       expect(formatted[1]).toContain('Invalid values for environment variables: NODE_ENV');
     });
   });

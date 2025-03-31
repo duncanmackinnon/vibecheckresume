@@ -7,9 +7,8 @@ declare global {
       // Application
       NEXT_PUBLIC_APP_URL: string;
       
-      // OpenAI Configuration
-      OPENAI_API_KEY: string;
-      OPENAI_ORG_ID?: string;
+      // Deepseek Configuration
+      DEEPSEEK_API_KEY: string;
       
       // Rate Limiting
       RATE_LIMIT: string;
@@ -57,7 +56,7 @@ export const envVars: EnvVars = {
   required: [
     'NODE_ENV',
     'NEXT_PUBLIC_APP_URL',
-    'OPENAI_API_KEY',
+    'DEEPSEEK_API_KEY',
     'RATE_LIMIT',
     'DB_HOST',
     'DB_PORT',

@@ -22,12 +22,11 @@ export function validateEnvironment(): ValidationResult {
     });
   }
 
-  // Validate OpenAI API Key format
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (apiKey && !apiKey.startsWith('sk-')) {
+  // Validate Deepseek API Key exists
+  if (!process.env.DEEPSEEK_API_KEY) {
     errors.push({
-      type: 'invalid',
-      variables: ['OPENAI_API_KEY']
+      type: 'missing',
+      variables: ['DEEPSEEK_API_KEY']
     });
   }
 

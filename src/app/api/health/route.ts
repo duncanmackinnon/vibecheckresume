@@ -26,7 +26,7 @@ interface HealthStatus {
     } | null;
   };
   services: {
-    openai: boolean;
+    deepseek: boolean;
     database: boolean;
     filesystem: boolean;
   };
@@ -80,14 +80,14 @@ function loadTestResults(): HealthStatus['tests'] {
 
 async function checkServices(): Promise<HealthStatus['services']> {
   const services = {
-    openai: false,
+    deepseek: false,
     database: true, // We're not using a database yet
     filesystem: false
   };
 
-  // Check OpenAI
-  const apiKey = process.env.OPENAI_API_KEY;
-  services.openai = validateApiKey(apiKey);
+  // Check Deepseek
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  services.deepseek = validateApiKey(apiKey);
 
   // Check filesystem
   try {
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Set status to error if any critical service is down
-    if (!services.openai || !services.filesystem) {
+    if (!services.deepseek || !services.filesystem) {
       health.status = 'error';
     }
 
@@ -154,7 +154,7 @@ export async function GET(request: NextRequest) {
 export async function HEAD(request: NextRequest) {
   try {
     const services = await checkServices();
-    const status = services.openai && services.filesystem ? 200 : 503;
+    const status = services.deepseek && services.filesystem ? 200 : 503;
 
     return new Response(null, {
       status,

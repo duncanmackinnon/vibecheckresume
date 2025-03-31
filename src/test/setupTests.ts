@@ -49,7 +49,7 @@ process.env = {
   ...process.env,
   NODE_ENV: 'test',
   NEXT_PUBLIC_APP_URL: 'http://localhost:3000',
-  OPENAI_API_KEY: 'sk-test123',
+  DEEPSEEK_API_KEY: 'test123',
   RATE_LIMIT: '10'
 };
 

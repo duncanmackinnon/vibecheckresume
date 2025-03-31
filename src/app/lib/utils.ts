@@ -13,11 +13,11 @@ export class ApiError extends Error {
 
 export async function handleApiError(response: Response): Promise<void> {
   if (!response.ok) {
-    const error = await response.json().catch(() => null);
+    const error = await response.json().catch(() => ({}));
     throw new ApiError(
-      error?.error || 'API request failed',
+      (error as {error?: string}).error || 'API request failed',
       response.status,
-      error?.code
+      (error as {code?: string}).code
     );
   }
 }
@@ -75,7 +75,6 @@ export function chunkText(text: string, maxChunkSize = 5000): string[] {
   const chunks: string[] = [];
   let currentChunk = '';
   
-  // Split by paragraphs first
   const paragraphs = text.split(/\n\s*\n/);
   
   for (const paragraph of paragraphs) {
@@ -84,7 +83,6 @@ export function chunkText(text: string, maxChunkSize = 5000): string[] {
         chunks.push(currentChunk);
         currentChunk = '';
       }
-      // Handle very large paragraphs by splitting them
       if (paragraph.length > maxChunkSize) {
         const words = paragraph.split(/\s+/);
         let currentWords = '';
@@ -131,17 +129,14 @@ export async function processInChunks<T>(
       while (queue.length > 0) {
         const [index, chunk] = queue.shift()!;
         try {
-          console.log(`Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars)`);
-          
           const result = await Promise.race([
             processor(chunk, index, chunks.length),
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error(`Chunk ${index + 1} timeout after ${timeoutMs}ms`)), timeoutMs)
             )
-          ]);
+          ]) as T;
           
           results[index] = result;
-          console.log(`Completed chunk ${index + 1}/${chunks.length}`);
         } catch (error) {
           console.error(`Error processing chunk ${index + 1}:`, error);
           throw error;
@@ -153,20 +148,16 @@ export async function processInChunks<T>(
     return results;
   }
   
-  // Sequential processing
   const results: T[] = [];
   for (const [index, chunk] of chunks.entries()) {
-    console.log(`Processing chunk ${index + 1}/${chunks.length} (${chunk.length} chars)`);
-    
     const result = await Promise.race([
       processor(chunk, index, chunks.length),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error(`Chunk ${index + 1} timeout after ${timeoutMs}ms`)), timeoutMs)
       )
-    ]);
+    ]) as T;
     
     results.push(result);
-    console.log(`Completed chunk ${index + 1}/${chunks.length}`);
   }
   return results;
 }

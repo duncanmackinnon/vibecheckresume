@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { analyzeResume } from '@/app/lib/deepseek';
 import {
   validateResume,
@@ -8,7 +8,7 @@ import {
 
 const getAnalyzer = () => analyzeResume;
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   console.log('Starting new analysis request...');
   const startTime = Date.now();
 
@@ -33,12 +33,9 @@ export async function POST(request: NextRequest) {
       validateJobDescription(jobDescription);
     } catch (error) {
       if (error instanceof ValidationError) {
-        return new Response(
-          JSON.stringify({ error: error.message }), 
-          { 
-            status: 400,
-            headers: { 'Content-Type': 'application/json' }
-          }
+        return NextResponse.json(
+          { error: error.message },
+          { status: 400 }
         );
       }
       throw error;
@@ -74,41 +71,30 @@ export async function POST(request: NextRequest) {
       const duration = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(`Analysis completed in ${duration}s`);
       
-      return new Response(
-        JSON.stringify(analysis), 
-        { 
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      return NextResponse.json(analysis);
     } catch (error: unknown) {
       clearTimeout(timeout);
       if (error instanceof Error) {
         console.error('Analysis error:', error.name, error.message);
         
         if (error.name === 'AbortError') {
-          return new Response(
-            JSON.stringify({
+          return NextResponse.json(
+            {
               error: 'Analysis timed out (120 seconds) - File too large',
               solution: 'Try reducing file size or simplifying job description'
-            }),
-            {
-              status: 504,
-              headers: { 'Content-Type': 'application/json' }
-            }
+            },
+            { status: 504 }
           );
         }
 
         if (error.message.includes('Invalid response') ||
             error.message.includes('truncated')) {
-          return new Response(
-            JSON.stringify({
+          return NextResponse.json(
+            {
               error: 'Invalid analysis response',
               details: 'The AI provider returned an incomplete or malformed response'
-            }),
-            {
-              status: 502,
-              headers: { 'Content-Type': 'application/json' }
-            }
+            },
+            { status: 502 }
           );
         }
       }
@@ -120,23 +106,20 @@ export async function POST(request: NextRequest) {
     console.error('Error during analysis:', error);
 
     if (error instanceof ValidationError) {
-      return new Response(
-        JSON.stringify({ error: error.message }), 
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 }
       );
     }
 
     if (error instanceof Error) {
-      return new Response(
-        JSON.stringify({ error: error.message }),
+      return NextResponse.json(
+        { error: error.message },
         { status: 500 }
       );
     }
-    return new Response(
-      JSON.stringify({ error: 'An unknown error occurred' }),
+    return NextResponse.json(
+      { error: 'An unknown error occurred' },
       { status: 500 }
     );
   }

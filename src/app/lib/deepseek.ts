@@ -7,6 +7,28 @@ import type { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/a
 const pdfjsLib = await import('pdfjs-dist');
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.min.js';
 
+// Polyfill for AbortSignal.any()
+function anySignal(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController();
+  
+  function onAbort() {
+    controller.abort();
+    for (const signal of signals) {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  for (const signal of signals) {
+    if (signal.aborted) {
+      onAbort();
+      break;
+    }
+    signal.addEventListener('abort', onAbort);
+  }
+
+  return controller.signal;
+}
+
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
 const MAX_TOKENS = 60000; // Stay well under 65536 limit
 const AVG_CHARS_PER_TOKEN = 4; // Rough estimate for token counting
@@ -75,7 +97,7 @@ async function summarizeText(text: string, signal?: AbortSignal): Promise<string
   // Process sections in batches of 2-3 for better context
   const batchSize = 3;
   let combinedSummary = '';
-  
+
   for (let i = 0; i < sections.length; i += batchSize) {
     const batch = sections.slice(i, i + batchSize).join('\n\n');
     const batchSummary = await callDeepSeek([{
@@ -90,7 +112,7 @@ async function summarizeText(text: string, signal?: AbortSignal): Promise<string
       role: 'user',
       content: batch
     }], signal);
-    
+
     combinedSummary += batchSummary + '\n\n';
   }
 
@@ -129,7 +151,7 @@ async function callDeepSeek(messages: DeepSeekMessage[], signal?: AbortSignal, r
           stream: false, // Disable streaming for faster response
           ...(requireJson && { response_format: { type: "json_object" } })
         }),
-        signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+        signal: signal ? anySignal([signal, controller.signal]) : controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -203,7 +225,7 @@ Include 'json' in response. Format as:
 async function extractTextFromPDF(pdfFile: File): Promise<string> {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/build/pdf.worker.min.js';
-  
+
   const arrayBuffer = await pdfFile.arrayBuffer();
   const loadingTask = pdfjs.getDocument({
     data: arrayBuffer,
@@ -217,7 +239,7 @@ async function extractTextFromPDF(pdfFile: File): Promise<string> {
   try {
     const pdf = await loadingTask.promise;
     let fullText = '';
-    
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const textContent = await page.getTextContent();
@@ -255,14 +277,14 @@ export const analyzeResume = async (
 ): Promise<Analysis> => {
   const resumeFile = formData.get('resume') as File;
   const jobDescription = formData.get('jobDescription') as string;
-  
+
   if (!resumeFile || !jobDescription) {
     throw new Error('Missing required input');
   }
 
   let resumeText = '';
   try {
-    resumeText = resumeFile.type === 'application/pdf' 
+    resumeText = resumeFile.type === 'application/pdf'
       ? await extractTextFromPDF(resumeFile)
       : await resumeFile.text();
   } catch (error) {
@@ -370,7 +392,7 @@ Return consistent scoring for identical inputs.`
 
     // Ensure score stays within bounds
     assessment.score = Math.min(100, Math.max(0, assessment.score));
-    
+
     return assessment;
   } catch (error) {
     console.error('Analysis error:', error);

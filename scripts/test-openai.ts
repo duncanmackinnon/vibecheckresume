@@ -85,15 +85,17 @@ function formatResults(result: Analysis): void {
   console.log('\nMissing Skills:');
   result.missingSkills
     .forEach(skill => console.log(`  ✗ ${skill}`));
-  
+
   if (result.recommendations) {
     console.log('\nStrengths:');
-    result.recommendations.strengths
-      .forEach(strength => console.log(`  • ${strength}`));
+    result.recommendations.strengths?.forEach(strength => 
+      console.log(`  • ${strength}`)
+    );
     
     console.log('\nSuggested Improvements:');
-    result.recommendations.improvements
-      .forEach(improvement => console.log(`  • ${improvement}`));
+    result.recommendations.improvements?.forEach(improvement => 
+      console.log(`  • ${improvement}`)
+    );
   }
   
   console.log('\nDetailed Analysis:');

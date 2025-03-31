@@ -46,47 +46,52 @@ function getSkillsCategory(skill: string): string {
   return 'other';
 }
 
-function generateRecommendations(
-  missingSkills: string[],
-  matchedSkills: Array<{ name: string; match: boolean }>,
-  score: number
-): {
+interface Recommendations {
   improvements: string[];
   strengths: string[];
   skillGaps: string[];
   format: string[];
-} {
-  const improvements = [];
-  const strengths = [];
-  const skillGaps = [];
-  const format = [
-    'Consider using a clear, professional format',
-    'Make sure your contact information is prominent',
-    'Use bullet points to highlight achievements',
-    'Include relevant metrics and results where possible'
-  ];
+  isChunked?: boolean;
+}
+
+function generateRecommendations(
+  missingSkills: string[],
+  matchedSkills: Array<{ name: string; match: boolean }>,
+  score: number
+): Recommendations {
+  const recommendations: Recommendations = {
+    improvements: [],
+    strengths: [],
+    skillGaps: [],
+    format: [
+      'Consider using a clear, professional format',
+      'Make sure your contact information is prominent',
+      'Use bullet points to highlight achievements',
+      'Include relevant metrics and results where possible'
+    ]
+  };
 
   // Add skill-based recommendations
   if (missingSkills.length > 0) {
-    skillGaps.push(
+    recommendations.skillGaps.push(
       `Consider adding experience with: ${missingSkills.join(', ')}`
     );
   }
 
   // Score-based recommendations
   if (score < 50) {
-    improvements.push(
+    recommendations.improvements.push(
       'Your resume needs significant alignment with the job requirements',
       'Focus on acquiring and highlighting relevant skills',
       'Consider taking courses or certifications in the missing skills'
     );
   } else if (score < 75) {
-    improvements.push(
+    recommendations.improvements.push(
       'Your resume shows good potential but could use some enhancement',
       'Try to highlight more specific examples of using the required skills'
     );
   } else {
-    strengths.push(
+    recommendations.strengths.push(
       'Your resume shows strong alignment with the job requirements',
       'You have a good foundation of relevant skills'
     );
@@ -98,18 +103,12 @@ function generateRecommendations(
     .map(skill => skill.name);
 
   if (strongSkills.length > 0) {
-    strengths.push(
+    recommendations.strengths.push(
       `Strong technical background in: ${strongSkills.join(', ')}`
     );
   }
 
-  return {
-    improvements,
-    strengths,
-    skillGaps,
-    format,
-    isChunked: false // Will be set by deepseek.ts for chunked processing
-  };
+  return recommendations;
 }
 
 export function analyzeResumeLocally(resumeText: string, jobDescription: string): Analysis {
@@ -134,14 +133,6 @@ export function analyzeResumeLocally(resumeText: string, jobDescription: string)
     matchedSkills,
     score
   );
-
-  return {
-    score,
-    matchedSkills,
-    missingSkills,
-    isChunked: false,
-    recommendations
-  };
 
   // Group skills by category
   const skillsByCategory = matchedSkills.reduce((acc, skill) => {
@@ -180,6 +171,7 @@ ${recommendations.strengths.length > 0 ? '\nKey strengths:\n' + recommendations.
     matchedSkills,
     missingSkills,
     recommendations,
-    detailedAnalysis
+    detailedAnalysis,
+    isChunked: false
   };
 }

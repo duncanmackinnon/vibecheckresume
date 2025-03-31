@@ -50,7 +50,7 @@
     "verify:quality": "npm run quality:analyze && node -e \"process.exit(require('./test-quality-report.json').score < 80 ? 1 : 0)\"",
     "verify:trends": "npm run quality:trend:week && node -e \"process.exit(require('./test-trends-analysis.json').trends.coverage.direction === 'declining' ? 1 : 0)\"",
     "verify": "npm run lint && npm run verify:env && npm run verify:tests && npm run verify:quality && npm run verify:trends",
-    "prepare": "npm run setup && husky install",
+    "prepare": "husky",
     "precommit": "lint-staged && npm run test:staged",
     "prepush": "npm run verify",
     "prestart": "npm run verify:env",

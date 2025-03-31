@@ -1,0 +1,57 @@
+name: Test Quality Checks
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - '**.test.ts'
+      - '**.test.tsx'
+      - '**.spec.ts'
+      - '**.spec.tsx'
+  push:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  quality:
+    name: Test Quality Analysis
+    runs-on: ubuntu-latest
+
+    env:
+      NODE_ENV: test
+      CI: true
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run test quality analysis
+        uses: ./.github/actions/test-quality
+        with:
+          node-version: '20'
+          coverage-threshold: '80'
+          quality-threshold: '75'
+          update-pr: ${{ github.event_name == 'pull_request' }}
+          send-notifications: true
+          archive-results: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Report job status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" != "success" ]; then
+            echo "::error::Test quality checks failed. See detailed report in artifacts."
+            exit 1
+          fi

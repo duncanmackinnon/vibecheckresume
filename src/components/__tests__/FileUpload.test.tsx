@@ -1,48 +1,43 @@
+import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import FileUpload from '../FileUpload';
+import { expect, test } from '@jest/globals';
 
-describe('FileUpload Component', () => {
+test('renders file upload area', () => {
   const mockOnFileUpload = jest.fn();
+  render(<FileUpload onFileUpload={mockOnFileUpload} />);
+  
+  expect(screen.getByText('Drag and drop your resume here')).toBeInTheDocument();
+  expect(screen.getByText('PDF or TXT files only')).toBeInTheDocument();
+  expect(screen.getByLabelText('Upload resume file')).toBeInTheDocument();
+});
 
-  beforeEach(() => {
-    mockOnFileUpload.mockClear();
-  });
+test('handles file selection via click', () => {
+  const mockOnFileUpload = jest.fn();
+  render(<FileUpload onFileUpload={mockOnFileUpload} />);
+  
+  const file = new File(['test content'], 'resume.pdf', { type: 'application/pdf' });
+  const input = screen.getByLabelText('Upload resume file');
+  
+  fireEvent.change(input, { target: { files: [file] } });
+  expect(mockOnFileUpload).toHaveBeenCalledWith(file);
+});
 
-  it('renders upload area with correct text', () => {
-    render(<FileUpload onFileUpload={mockOnFileUpload} />);
-    expect(screen.getByText(/Drag and drop your resume here/i)).toBeInTheDocument();
-    expect(screen.getByText(/PDF or TXT files only/i)).toBeInTheDocument();
-  });
-
-  it('handles file input change', () => {
-    render(<FileUpload onFileUpload={mockOnFileUpload} />);
-    const file = new File(['dummy content'], 'test.pdf', { type: 'application/pdf' });
-    const input = screen.getByRole('textbox', { hidden: true });
-
-    Object.defineProperty(input, 'files', {
-      value: [file],
+test('handles drag and drop', () => {
+  const mockOnFileUpload = jest.fn();
+  render(<FileUpload onFileUpload={mockOnFileUpload} />);
+  
+  const dropZone = screen.getByText('Drag and drop your resume here').parentElement?.parentElement;
+  const file = new File(['test content'], 'resume.pdf', { type: 'application/pdf' });
+  
+  if (dropZone) {
+    fireEvent.dragEnter(dropZone);
+    expect(dropZone).toHaveClass('border-blue-500');
+    
+    fireEvent.drop(dropZone, {
+      dataTransfer: { files: [file] }
     });
-
-    fireEvent.change(input);
     expect(mockOnFileUpload).toHaveBeenCalledWith(file);
-  });
-
-  it('handles drag and drop', () => {
-    render(<FileUpload onFileUpload={mockOnFileUpload} />);
-    const dropzone = screen.getByText(/Drag and drop your resume here/i).closest('div');
-    const file = new File(['dummy content'], 'test.pdf', { type: 'application/pdf' });
-
-    if (dropzone) {
-      fireEvent.dragEnter(dropzone.parentElement as HTMLElement);
-      expect(dropzone.parentElement?.classList.contains('border-blue-500')).toBe(true);
-
-      fireEvent.drop(dropzone.parentElement as HTMLElement, {
-        dataTransfer: {
-          files: [file],
-        },
-      });
-
-      expect(mockOnFileUpload).toHaveBeenCalledWith(file);
-    }
-  });
+    expect(dropZone).not.toHaveClass('border-blue-500');
+  }
 });

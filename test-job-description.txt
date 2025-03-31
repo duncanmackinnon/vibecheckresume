@@ -1,0 +1,32 @@
+Software Developer
+
+We are seeking a skilled Software Developer to join our dynamic team. The ideal candidate will have experience in modern web development and a passion for creating efficient, scalable solutions.
+
+Required Skills & Experience:
+- 3+ years of experience with JavaScript/TypeScript
+- Strong proficiency in React.js and Next.js
+- Experience with RESTful APIs and API integration
+- Familiarity with cloud services (AWS, Azure, or GCP)
+- Solid understanding of Git and version control
+- Experience with Node.js and Express
+- Knowledge of SQL and NoSQL databases
+
+Nice to Have:
+- Experience with Python
+- Knowledge of Docker and containerization
+- CI/CD pipeline experience
+- AWS certification
+- Experience with GraphQL
+- Knowledge of Agile methodologies
+
+Responsibilities:
+- Develop and maintain web applications using React and Next.js
+- Write clean, maintainable, and efficient code
+- Collaborate with team members using Git and GitHub
+- Integrate third-party APIs and services
+- Participate in code reviews and technical discussions
+- Debug and fix production issues
+- Write technical documentation
+
+Education:
+- Bachelor's degree in Computer Science or related field, or equivalent experience

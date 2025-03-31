@@ -1,0 +1,158 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: '18'
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  verify:
+    name: Verify and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Environment verification
+        run: npm run verify:env
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm run test:ci
+
+      - name: Generate coverage report
+        run: npm run test:report
+        
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+          
+      - name: Upload test report
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: test-report.txt
+
+  integration:
+    name: Integration Tests
+    needs: verify
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run OpenAI integration tests
+        run: npm run test:openai
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run error handling tests
+        run: npm run test:errors
+
+      - name: Run fixture tests
+        run: npm run test:fixtures
+
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-results
+          path: |
+            test-report.txt
+            coverage/
+
+  build:
+    name: Build
+    needs: [verify, integration]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: .next/
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build
+        uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: .next/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --production
+
+      - name: Deploy application
+        run: |
+          echo "Add your deployment steps here"
+          # Example for Vercel deployment:
+          # - name: Deploy to Vercel
+          #   run: vercel --prod --token ${{ secrets.VERCEL_TOKEN }}
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true

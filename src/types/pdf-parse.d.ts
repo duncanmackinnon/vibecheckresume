@@ -1,24 +1,18 @@
-declare module 'pdf-parse' {
-  interface PDFExtractResult {
+declare module 'pdf-parse/lib/pdf-parse.js' {
+  interface PDFData {
     text: string;
-    info: {
-      Author?: string;
-      CreationDate?: string;
-      Creator?: string;
-      Keywords?: string;
-      ModDate?: string;
-      Producer?: string;
-      Subject?: string;
-      Title?: string;
-    };
-    metadata: any;
-    version: string;
     numpages: number;
+    numrender: number;
+    info: Record<string, any>;
+    metadata: Record<string, any>;
+    version: string;
   }
 
-  export class PDFExtract {
-    extract(buffer: Buffer): Promise<PDFExtractResult>;
-  }
+  function pdfParse(dataBuffer: Buffer, options?: {
+    pagerender?: (pageData: any) => string;
+    max?: number;
+    version?: string;
+  }): Promise<PDFData>;
 
-  export default function(buffer: Buffer): Promise<PDFExtractResult>;
+  export = pdfParse;
 }

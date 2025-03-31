@@ -1,0 +1,71 @@
+{
+  "score": 85,
+  "matchedSkills": [
+    {
+      "name": "JavaScript",
+      "match": true
+    },
+    {
+      "name": "TypeScript",
+      "match": true
+    },
+    {
+      "name": "React",
+      "match": true
+    },
+    {
+      "name": "Node.js",
+      "match": true
+    },
+    {
+      "name": "Express",
+      "match": true
+    },
+    {
+      "name": "Git",
+      "match": true
+    },
+    {
+      "name": "AWS",
+      "match": true
+    },
+    {
+      "name": "Testing",
+      "match": true
+    }
+  ],
+  "missingSkills": [
+    "Python",
+    "Docker",
+    "Kubernetes",
+    "GraphQL"
+  ],
+  "recommendations": {
+    "improvements": [
+      "Consider gaining experience with Python as it's listed as a nice-to-have skill",
+      "Learn Docker and Kubernetes for containerization expertise",
+      "Add GraphQL to your technical skillset",
+      "Highlight more specific AWS services you've worked with"
+    ],
+    "strengths": [
+      "Strong core technical skills matching key requirements",
+      "Relevant experience in full-stack development",
+      "Leadership experience through mentoring",
+      "CI/CD and testing experience",
+      "Demonstrated performance optimization skills"
+    ],
+    "skillGaps": [
+      "Container orchestration (Docker/Kubernetes)",
+      "GraphQL API development",
+      "Python programming language",
+      "Machine learning experience"
+    ],
+    "format": [
+      "Resume is well-structured and easy to read",
+      "Good balance of technical and soft skills",
+      "Clear progression in career history",
+      "Consider adding more quantifiable achievements"
+    ]
+  },
+  "detailedAnalysis": "The candidate shows strong alignment with the core requirements of the position, particularly in full-stack development with JavaScript/TypeScript, React, and Node.js. Their 5+ years of experience matches the requirement exactly. The resume demonstrates experience in key areas such as API development, testing, and AWS cloud platform usage.\n\nStrong points include their experience mentoring junior developers, implementing CI/CD pipelines, and optimizing application performance - all of which are specifically mentioned in the job requirements. Their background in testing and debugging also aligns well with the position's needs.\n\nHowever, there are some gaps in the nice-to-have skills. While the candidate has AWS certification, they lack experience with Docker and Kubernetes, which could be valuable for this role. Python experience is also mentioned as desirable but isn't reflected in their skill set. The addition of GraphQL knowledge would further strengthen their candidacy.\n\nOverall, the candidate appears to be a strong match for the position, meeting most of the critical requirements and demonstrating relevant experience in a similar role. The missing skills are primarily in the nice-to-have category and could be learned on the job."
+}

@@ -1,0 +1,144 @@
+name: 'Test Quality Analysis'
+description: 'Runs comprehensive test quality analysis and reporting'
+author: 'Your Name'
+
+inputs:
+  node-version:
+    description: 'Node.js version to use'
+    required: false
+    default: '20'
+  coverage-threshold:
+    description: 'Minimum coverage threshold (%)'
+    required: false
+    default: '80'
+  quality-threshold:
+    description: 'Minimum quality score'
+    required: false
+    default: '75'
+  update-pr:
+    description: 'Whether to update PR with stats'
+    required: false
+    default: 'true'
+  send-notifications:
+    description: 'Whether to send notifications'
+    required: false
+    default: 'true'
+  archive-results:
+    description: 'Whether to archive results'
+    required: false
+    default: 'true'
+
+outputs:
+  coverage:
+    description: 'Overall test coverage percentage'
+    value: ${{ steps.analyze.outputs.coverage }}
+  quality-score:
+    description: 'Test quality score'
+    value: ${{ steps.analyze.outputs.quality-score }}
+  flaky-tests:
+    description: 'Number of flaky tests detected'
+    value: ${{ steps.analyze.outputs.flaky-tests }}
+  report-url:
+    description: 'URL to the generated report'
+    value: ${{ steps.upload.outputs.report-url }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        npm ci
+        echo "MIN_COVERAGE=${{ inputs.coverage-threshold }}" >> $GITHUB_ENV
+        echo "QUALITY_THRESHOLD=${{ inputs.quality-threshold }}" >> $GITHUB_ENV
+
+    - name: Set up test environment
+      shell: bash
+      run: npm run test:setup
+
+    - name: Run tests with coverage
+      shell: bash
+      run: npm run test:ci
+
+    - name: Analyze test quality
+      id: analyze
+      shell: bash
+      run: |
+        npm run quality
+        COVERAGE=$(jq '.coverage.lines' test-quality-report.json)
+        QUALITY_SCORE=$(jq '.quality.maintainability' test-quality-report.json)
+        FLAKY_TESTS=$(jq '.quality.flakiness * 100' test-quality-report.json)
+        echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+        echo "quality-score=${QUALITY_SCORE}" >> $GITHUB_OUTPUT
+        echo "flaky-tests=${FLAKY_TESTS}" >> $GITHUB_OUTPUT
+
+    - name: Check coverage trends
+      shell: bash
+      run: npm run quality:trend:week
+
+    - name: Generate weekly report
+      shell: bash
+      run: npm run report:weekly
+
+    - name: Update PR with stats
+      if: inputs.update-pr == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      run: npm run update-pr-stats
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+
+    - name: Check quality standards
+      shell: bash
+      run: |
+        npm run verify:quality
+        npm run verify:trends
+
+    - name: Upload artifacts
+      id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-quality-reports
+        path: |
+          coverage/
+          test-results/
+          reports/
+          test-quality-report.*
+          test-trends-report.*
+        if-no-files-found: error
+
+    - name: Send notifications
+      if: inputs.send-notifications == 'true'
+      shell: bash
+      run: npm run report:all
+      env:
+        CI_NOTIFICATION_ENABLED: true
+
+    - name: Save coverage badges
+      if: inputs.archive-results == 'true' && github.ref == 'refs/heads/main'
+      shell: bash
+      run: |
+        npm run coverage:badges
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        git add coverage/*.svg
+        git commit -m "Update coverage badges [skip ci]" || true
+        git push
+
+    - name: Archive test trends
+      if: inputs.archive-results == 'true' && github.ref == 'refs/heads/main'
+      shell: bash
+      run: |
+        npm run report:archive
+        git add reports/archive-*.tar.gz
+        git commit -m "Archive test trends [skip ci]" || true
+        git push
+
+branding:
+  icon: 'check-circle'
+  color: 'green'

@@ -1,0 +1,152 @@
+name: 🐛 Bug Report
+description: Create a report to help us improve
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        Please provide as much information as possible to help us resolve the issue.
+
+  - type: checkboxes
+    attributes:
+      label: Prerequisites
+      description: Please ensure you've completed these steps before submitting your issue.
+      options:
+        - label: I have checked for existing issues that describe my problem
+          required: true
+        - label: I am running the latest version of the software
+          required: true
+        - label: I have read the documentation
+          required: true
+        - label: I have run the test suite locally
+          required: true
+
+  - type: input
+    attributes:
+      label: Node.js Version
+      description: What version of Node.js are you running?
+      placeholder: e.g., v18.15.0
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Environment
+      description: Where does this issue occur?
+      options:
+        - Development
+        - Testing
+        - Production
+        - CI/CD Pipeline
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Test Status
+      description: What is the status of the test suite?
+      options:
+        - All tests pass
+        - Unit tests fail
+        - Integration tests fail
+        - OpenAI tests fail
+        - Error handling tests fail
+        - Multiple test failures
+        - Tests not run
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Current Behavior
+      description: A clear description of what the bug is.
+      placeholder: |
+        Example: When I upload a PDF resume, the analysis fails with...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+      placeholder: |
+        Example: The resume should be analyzed and show matching skills...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps To Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Upload file '....'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Error Message
+      description: If applicable, paste the error message or logs here
+      render: shell
+
+  - type: textarea
+    attributes:
+      label: Test Results
+      description: Paste relevant test output here
+      placeholder: |
+        npm run test:all output
+        or specific test failures
+      render: shell
+
+  - type: textarea
+    attributes:
+      label: Environment Details
+      description: Additional environment details that might be relevant
+      placeholder: |
+        - Operating System:
+        - Browser Version:
+        - npm Version:
+        - Test Coverage:
+        - Environment Variables (no secrets):
+
+  - type: textarea
+    attributes:
+      label: Error Logs
+      description: Any relevant error logs or stack traces
+      render: shell
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here
+      placeholder: |
+        Screenshots, videos, or additional information that might help us understand the issue.
+
+  - type: dropdown
+    attributes:
+      label: Impact
+      description: How does this bug affect your use of the application?
+      options:
+        - Blocking - Cannot use the application
+        - Major - Key feature unusable
+        - Minor - Feature works with workaround
+        - Trivial - Cosmetic issue
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Reproducibility
+      description: How often does this issue occur?
+      options:
+        - Always
+        - Frequently
+        - Sometimes
+        - Rarely
+        - Unable to reproduce
+    validations:
+      required: true

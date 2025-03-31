@@ -1,0 +1,39 @@
+JOHN DOE
+Software Developer
+john.doe@email.com | (555) 123-4567 | github.com/johndoe
+
+SUMMARY
+Experienced software developer with 4 years of experience specializing in full-stack web development. Proven track record of delivering high-quality applications using React, TypeScript, and Node.js. Strong focus on clean code and best practices.
+
+TECHNICAL SKILLS
+- Frontend: React.js, Next.js, TypeScript, JavaScript, HTML5, CSS3, Tailwind CSS
+- Backend: Node.js, Express, Python
+- Databases: MongoDB, PostgreSQL
+- Tools: Git, GitHub, VS Code, Docker
+- Cloud: AWS (S3, Lambda, EC2)
+- Testing: Jest, React Testing Library
+
+PROFESSIONAL EXPERIENCE
+
+Senior Frontend Developer | TechCorp Inc. | 2022-Present
+- Led development of a Next.js-based e-commerce platform serving 100k+ monthly users
+- Implemented CI/CD pipelines using GitHub Actions, reducing deployment time by 40%
+- Collaborated with design team to create reusable React components
+- Mentored junior developers and conducted code reviews
+- Integrated multiple third-party APIs and payment services
+
+Software Developer | WebSolutions Co. | 2020-2022
+- Developed and maintained React applications for enterprise clients
+- Built RESTful APIs using Node.js and Express
+- Implemented responsive designs using Tailwind CSS
+- Worked with agile methodologies in a remote team setting
+
+EDUCATION
+Bachelor of Science in Computer Science
+University of Technology | 2016-2020
+- GPA: 3.8/4.0
+- Relevant coursework: Data Structures, Algorithms, Web Development
+
+CERTIFICATIONS
+- AWS Certified Developer – Associate
+- MongoDB Certified Developer

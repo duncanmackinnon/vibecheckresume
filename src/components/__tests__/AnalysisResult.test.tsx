@@ -1,114 +1,36 @@
+import React from 'react';
 import { render, screen } from '@testing-library/react';
 import AnalysisResult from '../AnalysisResult';
+import { expect, test } from '@jest/globals';
 
-describe('AnalysisResult Component', () => {
-  const mockHighMatchResult = {
-    score: 85,
-    matchedSkills: [
-      { name: 'React', match: true },
-      { name: 'TypeScript', match: true },
-      { name: 'Node.js', match: false },
-    ],
-    missingSkills: ['Python', 'AWS'],
-    isLoading: false,
-  };
+const mockProps = {
+  matchScore: 75,
+  strengths: ['React', 'TypeScript'],
+  weaknesses: ['Limited backend experience'],
+  missingSkills: ['Node.js', 'AWS'],
+  recommendations: ['Add more project details', 'Highlight leadership experience'],
+  detailedAnalysis: 'Your resume shows strong frontend skills but lacks backend experience.'
+};
 
-  const mockLowMatchResult = {
-    score: 45,
-    matchedSkills: [
-      { name: 'JavaScript', match: true },
-      { name: 'HTML', match: false },
-    ],
-    missingSkills: ['React', 'TypeScript', 'Node.js'],
-    isLoading: false,
-  };
+test('displays analysis results correctly', () => {
+  render(<AnalysisResult {...mockProps} />);
+  
+  expect(screen.getByText('75% Match')).toBeInTheDocument();
+  expect(screen.getByText('React')).toBeInTheDocument();
+  expect(screen.getByText('TypeScript')).toBeInTheDocument();
+  expect(screen.getByText('Limited backend experience')).toBeInTheDocument();
+  expect(screen.getByText('Node.js')).toBeInTheDocument();
+  expect(screen.getByText('Add more project details')).toBeInTheDocument();
+  expect(screen.getByText('Your resume shows strong frontend skills')).toBeInTheDocument();
+});
 
-  it('renders loading state correctly', () => {
-    render(
-      <AnalysisResult
-        score={0}
-        matchedSkills={[]}
-        missingSkills={[]}
-        isLoading={true}
-      />
-    );
-    expect(screen.getByTestId('loading-animation')).toBeInTheDocument();
-  });
+test('renders different score colors correctly', () => {
+  const { rerender } = render(<AnalysisResult {...mockProps} matchScore={85} />);
+  expect(screen.getByText('85% Match')).toHaveClass('text-green-600');
 
-  it('displays high match score in green', () => {
-    const { score, matchedSkills, missingSkills } = mockHighMatchResult;
-    render(
-      <AnalysisResult
-        score={score}
-        matchedSkills={matchedSkills}
-        missingSkills={missingSkills}
-      />
-    );
-    const scoreElement = screen.getByText(/85% Match/i);
-    expect(scoreElement).toHaveClass('text-green-600', 'bg-green-50');
-  });
+  rerender(<AnalysisResult {...mockProps} matchScore={65} />);
+  expect(screen.getByText('65% Match')).toHaveClass('text-yellow-600');
 
-  it('displays low match score in red', () => {
-    const { score, matchedSkills, missingSkills } = mockLowMatchResult;
-    render(
-      <AnalysisResult
-        score={score}
-        matchedSkills={matchedSkills}
-        missingSkills={missingSkills}
-      />
-    );
-    const scoreElement = screen.getByText(/45% Match/i);
-    expect(scoreElement).toHaveClass('text-red-600', 'bg-red-50');
-  });
-
-  it('renders matched skills correctly', () => {
-    const { score, matchedSkills, missingSkills } = mockHighMatchResult;
-    render(
-      <AnalysisResult
-        score={score}
-        matchedSkills={matchedSkills}
-        missingSkills={missingSkills}
-      />
-    );
-    expect(screen.getByText('React')).toHaveClass('bg-green-100');
-    expect(screen.getByText('Node.js')).toHaveClass('bg-gray-100');
-  });
-
-  it('renders missing skills section when there are missing skills', () => {
-    const { score, matchedSkills, missingSkills } = mockHighMatchResult;
-    render(
-      <AnalysisResult
-        score={score}
-        matchedSkills={matchedSkills}
-        missingSkills={missingSkills}
-      />
-    );
-    expect(screen.getByText('Missing Skills')).toBeInTheDocument();
-    missingSkills.forEach(skill => {
-      expect(screen.getByText(skill)).toHaveClass('bg-red-100');
-    });
-  });
-
-  it('does not render missing skills section when there are no missing skills', () => {
-    render(
-      <AnalysisResult
-        score={85}
-        matchedSkills={mockHighMatchResult.matchedSkills}
-        missingSkills={[]}
-      />
-    );
-    expect(screen.queryByText('Missing Skills')).not.toBeInTheDocument();
-  });
-
-  it('includes a download report button', () => {
-    const { score, matchedSkills, missingSkills } = mockHighMatchResult;
-    render(
-      <AnalysisResult
-        score={score}
-        matchedSkills={matchedSkills}
-        missingSkills={missingSkills}
-      />
-    );
-    expect(screen.getByText(/Download Report/i)).toBeInTheDocument();
-  });
+  rerender(<AnalysisResult {...mockProps} matchScore={45} />);
+  expect(screen.getByText('45% Match')).toHaveClass('text-red-600');
 });

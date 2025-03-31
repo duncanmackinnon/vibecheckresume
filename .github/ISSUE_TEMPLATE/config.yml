@@ -1,0 +1,50 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 📚 Documentation
+    url: https://github.com/yourusername/vibecheckresume/blob/main/README.md
+    about: Check our documentation before creating an issue
+
+  - name: 💬 Discussions
+    url: https://github.com/yourusername/vibecheckresume/discussions
+    about: Ask questions and share ideas
+
+  - name: 🤝 Contributing Guide
+    url: https://github.com/yourusername/vibecheckresume/blob/main/CONTRIBUTING.md
+    about: Learn how to contribute to the project
+
+  - name: 🧪 Testing Guide
+    url: https://github.com/yourusername/vibecheckresume/blob/main/CONTRIBUTING.md#testing
+    about: Learn about our testing process and requirements
+
+  - name: 🔒 Security Policy
+    url: https://github.com/yourusername/vibecheckresume/security/policy
+    about: Report security vulnerabilities here
+
+  - name: 🚀 Feature Requests Discussion
+    url: https://github.com/yourusername/vibecheckresume/discussions/categories/ideas
+    about: Share and discuss new feature ideas
+
+  - name: ❓ FAQ
+    url: https://github.com/yourusername/vibecheckresume/wiki/FAQ
+    about: Check frequently asked questions
+
+  - name: 🐛 Common Issues
+    url: https://github.com/yourusername/vibecheckresume/wiki/Common-Issues
+    about: Solutions to common problems
+
+  - name: 📝 API Documentation
+    url: https://github.com/yourusername/vibecheckresume/wiki/API-Documentation
+    about: API reference and usage guide
+    
+  - name: 🧰 Development Setup
+    url: https://github.com/yourusername/vibecheckresume/blob/main/CONTRIBUTING.md#development-setup
+    about: Learn how to set up your development environment
+
+  - name: 🎯 Project Roadmap
+    url: https://github.com/yourusername/vibecheckresume/projects/1
+    about: View our project roadmap and upcoming features
+
+  - name: 📊 Test Reports
+    url: https://github.com/yourusername/vibecheckresume/actions
+    about: View the latest test results and coverage reports

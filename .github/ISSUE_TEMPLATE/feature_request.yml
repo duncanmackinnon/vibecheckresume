@@ -1,0 +1,176 @@
+name: ✨ Feature Request
+description: Suggest an idea for this project
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest a new feature!
+        Please provide detailed information to help us understand your suggestion.
+
+  - type: checkboxes
+    attributes:
+      label: Prerequisites
+      description: Please confirm these before submitting
+      options:
+        - label: I have checked that this feature hasn't already been requested
+          required: true
+        - label: I have read the documentation
+          required: true
+        - label: This is a single feature (not multiple features)
+          required: true
+        - label: I have considered testing implications
+          required: true
+
+  - type: textarea
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve?
+      placeholder: |
+        Example: Users currently struggle with...
+        Current workflow is inefficient because...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: Describe your proposed solution
+      placeholder: |
+        Example: Add a feature that...
+        This would work by...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Implementation Details
+      description: Technical details about implementation
+      placeholder: |
+        - Required changes:
+          - New components needed
+          - API modifications
+          - Database changes
+        
+        - Testing considerations:
+          - Unit tests needed
+          - Integration test updates
+          - New test fixtures required
+        
+        - Performance implications:
+          - Expected impact
+          - Optimization opportunities
+
+  - type: dropdown
+    attributes:
+      label: Feature Category
+      description: What area does this feature primarily relate to?
+      options:
+        - Resume Analysis
+        - Job Description Processing
+        - User Interface
+        - API Integration
+        - Performance
+        - Testing
+        - Documentation
+        - Developer Experience
+        - Configuration
+        - Security
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Testing Impact
+      description: How will this affect our test suite?
+      options:
+        - Minimal (only unit tests needed)
+        - Moderate (unit + integration tests)
+        - Significant (major test updates needed)
+        - Complex (new test framework needed)
+        - Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Testing Requirements
+      description: Describe testing needs for this feature
+      placeholder: |
+        - Unit Tests:
+          - New components to test
+          - Edge cases to consider
+        
+        - Integration Tests:
+          - API interactions
+          - Component integration
+        
+        - Test Data:
+          - New fixtures needed
+          - Mock requirements
+
+  - type: textarea
+    attributes:
+      label: Alternative Solutions
+      description: What alternatives have you considered?
+      placeholder: |
+        Alternative 1:
+        - Pros:
+        - Cons:
+        
+        Alternative 2:
+        - Pros:
+        - Cons:
+
+  - type: dropdown
+    attributes:
+      label: Priority
+      description: How important is this feature?
+      options:
+        - Critical (blocking work)
+        - High (major improvement)
+        - Medium (significant enhancement)
+        - Low (nice to have)
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Benefits
+      description: What are the benefits of implementing this feature?
+      placeholder: |
+        - User Benefits:
+          - Improves workflow by...
+          - Saves time by...
+        
+        - Technical Benefits:
+          - Better performance
+          - Improved maintainability
+        
+        - Business Benefits:
+          - Increased efficiency
+          - Better user satisfaction
+
+  - type: textarea
+    attributes:
+      label: Documentation Requirements
+      description: What documentation updates would be needed?
+      placeholder: |
+        - README updates
+        - API documentation
+        - Test documentation
+        - Usage examples
+        - Configuration guide
+
+  - type: checkboxes
+    attributes:
+      label: Additional Considerations
+      description: Please check all that apply
+      options:
+        - label: This feature requires database changes
+        - label: This feature requires API changes
+        - label: This feature affects performance
+        - label: This feature needs security review
+        - label: This feature requires UI changes
+        - label: This feature needs accessibility considerations

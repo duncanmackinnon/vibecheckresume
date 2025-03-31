@@ -1,16 +1,47 @@
-import { useState } from 'react';
+'use client';
 
-interface JobDescriptionProps {
-  onJobDescriptionSubmit: (description: string) => void;
+import { useState } from 'react';
+import { cn } from '@/app/lib/utils';
+
+export interface JobDescriptionProps {
+  onJobDescriptionSubmit: (jobDescription: File) => void;
+  isDisabled?: boolean;
 }
 
-export default function JobDescription({ onJobDescriptionSubmit }: JobDescriptionProps) {
+export default function JobDescription({ 
+  onJobDescriptionSubmit,
+  isDisabled = false
+}: JobDescriptionProps) {
   const [description, setDescription] = useState('');
+  const [file, setFile] = useState<File | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (description.trim()) {
-      onJobDescriptionSubmit(description);
+    if (file) {
+      onJobDescriptionSubmit(file);
+    } else if (description.trim()) {
+      // Create a File object from the text input
+      const blob = new Blob([description], { type: 'text/plain' });
+      const textFile = new File([blob], 'job-description.txt', { type: 'text/plain' });
+      onJobDescriptionSubmit(textFile);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setDescription('');
+    } else {
+      // Clear file if input was cleared
+      setFile(null);
+    }
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDescription(e.target.value);
+    // Clear file if text is entered
+    if (e.target.value) {
+      setFile(null);
     }
   };
 
@@ -27,22 +58,28 @@ export default function JobDescription({ onJobDescriptionSubmit }: JobDescriptio
           <textarea
             id="jobDescription"
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Paste the job description here..."
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={handleTextChange}
+            className={cn(
+              "w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm",
+              "focus:ring-blue-500 focus:border-blue-500",
+              isDisabled && "bg-gray-100 cursor-not-allowed"
+            )}
+            placeholder="Paste the job description here..."
+            disabled={isDisabled}
           />
         </div>
         <button
           type="submit"
-          disabled={!description.trim()}
-          className={`w-full py-2 px-4 rounded-md text-white font-medium
-            ${description.trim()
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-gray-400 cursor-not-allowed'
-            }`}
+          disabled={!description.trim() || isDisabled}
+          className={cn(
+            "w-full py-2 px-4 rounded-md text-white font-medium",
+            description.trim() && !isDisabled
+              ? "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              : "bg-gray-400 cursor-not-allowed"
+          )}
         >
-          Analyze Resume
+          {isDisabled ? "Analyzing..." : "Analyze Resume"}
         </button>
       </form>
     </div>

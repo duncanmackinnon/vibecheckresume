@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - OPENAI_API_KEY=${OPENAI_API_KEY}
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    command: npm run test:all
+
+  test-watch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run test:watch
+
+  test-coverage:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    command: npm run test:coverage
+
+  test-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./test-results:/app/test-results
+    command: >
+      sh -c "npm run test:openai &&
+             npm run test:errors"
+
+  test-components:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    command: npm run test:components
+
+  test-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+    command: npm run test:api
+
+  test-ci:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=test
+      - CI=true
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    command: sh scripts/run-tests.sh
+
+networks:
+  default:
+    name: resume-analyzer
+    driver: bridge
+
+volumes:
+  node_modules:
+  coverage:
+  test-results:

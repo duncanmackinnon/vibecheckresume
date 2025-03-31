@@ -1,0 +1,29 @@
+{
+  "technicalDebt": {
+    "critical": [],
+    "high": [],
+    "medium": []
+  },
+  "featureMatrix": {
+    "implementation": [
+      "Resume parsing",
+      "Job description analysis",
+      "Basic matching"
+    ],
+    "proposed": [
+      "Multi-resume comparison",
+      "Interview question generation",
+      "Skill gap analysis"
+    ]
+  },
+  "recommendations": {
+    "immediate": [
+      "Improve error handling for malformed resumes",
+      "Add more test coverage for edge cases"
+    ],
+    "strategic": [
+      "Implement CI/CD pipeline",
+      "Add performance monitoring"
+    ]
+  }
+}

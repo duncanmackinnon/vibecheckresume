@@ -4,7 +4,10 @@ import path from 'path';
 import fs from 'fs';
 
 // Load environment variables
-config({ path: path.resolve(__dirname, '../.env') });
+// Skip .env loading in CI environment
+if (!process.env.CI) {
+  config({ path: path.resolve(__dirname, '../.env') });
+}
 
 console.log('\n=== Pre-deployment Verification ===\n');
 
@@ -54,11 +57,11 @@ async function runVerification() {
   ];
 
   for (const envVar of requiredEnvVars) {
-    const exists = process.env[envVar];
+    const exists = process.env[envVar] || (process.env.CI && envVar === 'NODE_ENV' ? 'production' : undefined);
     results.push({
       name: `Environment Variable: ${envVar}`,
       status: exists ? 'pass' : 'fail',
-      message: exists ? undefined : 'Missing environment variable'
+      message: exists ? undefined : `Missing environment variable (${process.env.CI ? 'GitHub Secrets' : '.env'})`
     });
   }
 

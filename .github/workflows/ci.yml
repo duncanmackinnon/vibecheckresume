@@ -72,8 +72,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run OpenAI integration tests
-        run: npm run test:openai
+      - name: Run Deepseek integration tests
+        run: npm run test:deepseek
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
 

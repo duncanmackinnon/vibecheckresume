@@ -1,7 +1,6 @@
 #!/usr/bin/env ts-node
 import { config } from 'dotenv';
 import path from 'path';
-import { validateApiKey } from '../src/app/lib/utils';
 import fs from 'fs';
 
 // Load environment variables
@@ -50,7 +49,7 @@ async function runVerification() {
 
   // Check environment variables
   const requiredEnvVars = [
-    'OPENAI_API_KEY',
+    'DEEPSEEK_API_KEY',
     'NODE_ENV'
   ];
 
@@ -63,12 +62,12 @@ async function runVerification() {
     });
   }
 
-  // Validate OpenAI API key format
-  const apiKey = process.env.OPENAI_API_KEY;
+  // Validate Deepseek API key exists
+  const apiKey = process.env.DEEPSEEK_API_KEY;
   results.push({
-    name: 'OpenAI API Key Format',
-    status: validateApiKey(apiKey) ? 'pass' : 'fail',
-    message: validateApiKey(apiKey) ? undefined : 'Invalid API key format'
+    name: 'Deepseek API Key',
+    status: apiKey ? 'pass' : 'fail',
+    message: apiKey ? undefined : 'Missing API key'
   });
 
   // Check package.json dependencies

@@ -16,13 +16,12 @@ jobs:
           node-version: '20'
           cache: 'npm'
       
-      - run: npm install
-      
       - name: Create .env file
         run: |
           echo "DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}" > .env
-          echo "NODE_ENV=production" >> .env
+          echo "NODE_ENV=resumeenv" >> .env
       
+      - run: npm install
       - run: npm run build
       
       - name: Deploy

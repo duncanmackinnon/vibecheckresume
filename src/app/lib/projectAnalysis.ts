@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { analyzeResumeLocally } from './localAnalysis';
+import { analyzeResume } from './localAnalysis';
 
 interface TechnicalDebt {
   critical: string[];
@@ -42,7 +42,7 @@ export async function analyzeProject(includeQuality = false): Promise<ProjectAna
     'utf-8'
   );
 
-  const resumeAnalysis = analyzeResumeLocally(testResume, testJob);
+  const resumeAnalysis = analyzeResume(testResume, testJob);
 
   // Identify technical debt
   const technicalDebt: TechnicalDebt = {

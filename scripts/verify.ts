@@ -22,13 +22,11 @@ async function runVerification() {
 
   // Check Node.js version
   const nodeVersion = process.version;
-  const requiredVersion = 'v16';
+  const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0], 10);
   results.push({
     name: 'Node.js Version',
-    status: nodeVersion.startsWith(requiredVersion) || 
-           nodeVersion.startsWith('v18') || 
-           nodeVersion.startsWith('v20') ? 'pass' : 'fail',
-    message: `Using ${nodeVersion}, required >= ${requiredVersion}`
+    status: majorVersion >= 16 ? 'pass' : 'fail',
+    message: `Using ${nodeVersion}, required >= v16`
   });
 
   // Check required files

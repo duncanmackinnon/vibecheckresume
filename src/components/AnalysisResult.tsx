@@ -1,3 +1,5 @@
+import React from 'react';
+import ReactMarkdown from 'react-markdown';
 'use client';
 
 import { cn } from '@/app/lib/utils';
@@ -104,7 +106,10 @@ export default function AnalysisResult({
         {detailedAnalysis && (
           <div>
             <h4 className="text-lg font-medium text-gray-900 mb-3">Detailed Analysis</h4>
-            <p className="text-gray-600 whitespace-pre-line">{detailedAnalysis}</p>
+            {/* Render markdown using react-markdown */}
+            <div className="prose max-w-none text-gray-600">
+              <ReactMarkdown>{detailedAnalysis}</ReactMarkdown>
+            </div>
           </div>
         )}
 

@@ -55,3 +55,6 @@ logs/
 # Firebase
 .firebase/
 firebase-debug.log*
+
+.vercel
+.env*.local

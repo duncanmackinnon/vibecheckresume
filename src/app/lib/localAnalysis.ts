@@ -64,54 +64,91 @@ function generateRecommendations(
     strengths: [],
     skillGaps: [],
     format: [
-      'Consider using a clear, professional format',
-      'Make sure your contact information is prominent',
-      'Use bullet points to highlight achievements',
-      'Include relevant metrics and results where possible'
+      'Include a clear professional summary highlighting your expertise and career goals',
+      'Structure your experience section with measurable achievements and impact',
+      'Use industry-standard formatting with consistent spacing and bullet points',
+      'Include relevant certifications and educational qualifications prominently',
+      'Add a dedicated skills section organized by categories (e.g., Programming Languages, Frameworks, Tools)'
     ]
   };
 
-  // Add skill-based recommendations
-  if (missingSkills.length > 0) {
-    recommendations.skillGaps.push(
-      `Consider adding experience with: ${missingSkills.join(', ')}`
-    );
-  }
+  // Analyze skill gaps by category
+  const missingSkillsByCategory = missingSkills.reduce((acc, skill) => {
+    const category = getSkillsCategory(skill);
+    if (!acc[category]) acc[category] = [];
+    acc[category].push(skill);
+    return acc;
+  }, {} as Record<string, string[]>);
 
-  // Score-based recommendations
+  // Generate specific recommendations for each category
+  Object.entries(missingSkillsByCategory).forEach(([category, skills]) => {
+    if (skills.length > 0) {
+      const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+      recommendations.skillGaps.push(
+        `${categoryName} skills to develop: ${skills.join(', ')}`
+      );
+
+      // Add specific improvement suggestions based on category
+      const suggestion = getCategorySpecificSuggestion(category, skills);
+      if (suggestion) {
+        recommendations.improvements.push(suggestion);
+      }
+    }
+  });
+
+  // Score-based detailed recommendations
   if (score < 50) {
     recommendations.improvements.push(
-      'Your resume needs significant alignment with the job requirements',
-      'Focus on acquiring and highlighting relevant skills',
-      'Consider taking courses or certifications in the missing skills'
+      'Focus on acquiring fundamental skills required for the position',
+      'Consider completing relevant online courses or certifications',
+      'Gain practical experience through personal projects or contributions to open source',
+      'Network with professionals in the field to understand skill requirements better'
     );
   } else if (score < 75) {
     recommendations.improvements.push(
-      'Your resume shows good potential but could use some enhancement',
-      'Try to highlight more specific examples of using the required skills'
-    );
-  } else {
-    recommendations.strengths.push(
-      'Your resume shows strong alignment with the job requirements',
-      'You have a good foundation of relevant skills'
+      "Highlight specific projects where you have applied the required skills",
+      'Quantify your achievements with metrics and results',
+      'Add more detailed examples of your technical implementations'
     );
   }
 
-  // Add matched skills to strengths
-  const strongSkills = matchedSkills
+  // Analyze and highlight strengths
+  const skillsByCategory = matchedSkills
     .filter(skill => skill.match)
-    .map(skill => skill.name);
+    .reduce((acc, skill) => {
+      const category = getSkillsCategory(skill.name);
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(skill.name);
+      return acc;
+    }, {} as Record<string, string[]>);
 
-  if (strongSkills.length > 0) {
-    recommendations.strengths.push(
-      `Strong technical background in: ${strongSkills.join(', ')}`
-    );
-  }
+  Object.entries(skillsByCategory).forEach(([category, skills]) => {
+    if (skills.length > 0) {
+      const categoryName = category.charAt(0).toUpperCase() + category.slice(1);
+      recommendations.strengths.push(
+        `Strong ${categoryName} background with expertise in: ${skills.join(', ')}`
+      );
+    }
+  });
 
   return recommendations;
 }
 
-export function analyzeResumeLocally(resumeText: string, jobDescription: string): Analysis {
+function getCategorySpecificSuggestion(category: string, skills: string[]): string {
+  const suggestions: Record<string, string> = {
+    programming: `Consider building personal projects using ${skills.slice(0, 3).join(', ')} to demonstrate practical experience`,
+    frontend: `Gain hands-on experience with ${skills.join(', ')} through building responsive web applications`,
+    backend: `Create REST APIs or backend services using ${skills.join(', ')} to showcase your server-side capabilities`,
+    database: `Practice database design and implementation using ${skills.join(', ')}`,
+    cloud: `Obtain certifications in ${skills.slice(0, 2).join(' or ')} to validate your cloud expertise`,
+    testing: `Implement comprehensive test suites using ${skills.join(', ')} in your projects`,
+    soft_skills: `Seek leadership or team projects to develop ${skills.join(', ')} abilities`
+  };
+
+  return suggestions[category] || '';
+}
+
+export function analyzeResume(resumeText: string, jobDescription: string): Analysis {
   const allSkills = Object.values(COMMON_SKILLS).flat();
   const jobSkills = findSkillMatches(jobDescription, allSkills);
 
@@ -137,33 +174,38 @@ export function analyzeResumeLocally(resumeText: string, jobDescription: string)
   // Group skills by category
   const skillsByCategory = matchedSkills.reduce((acc, skill) => {
     const category = getSkillsCategory(skill.name);
-    if (!acc[category]) {
-      acc[category] = [];
-    }
+    if (!acc[category]) acc[category] = [];
     acc[category].push(skill);
     return acc;
   }, {} as Record<string, typeof matchedSkills>);
 
   const detailedAnalysis = `
-Based on the local analysis:
+Based on the detailed analysis:
 - Overall match score: ${score}%
 - Found ${matchedSkills.filter(s => s.match).length} matching skills
-- Identified ${missingSkills.length} missing skills
+- Identified ${missingSkills.length} skill gaps
 
-Skills by Category:
+Skills Analysis by Category:
 ${Object.entries(skillsByCategory)
-      .map(([category, skills]) => {
-        const matched = skills.filter(s => s.match).map(s => s.name).join(', ');
-        const missing = skills.filter(s => !s.match).map(s => s.name).join(', ');
-        return `
-${category.toUpperCase()}:
-${matched ? `✓ Matched: ${matched}` : ''}
-${missing ? `⨯ Missing: ${missing}` : ''}`;
-      })
-      .join('\n')}
+    .map(([category, skills]) => {
+      const matched = skills.filter(s => s.match).map(s => s.name).join(', ');
+      const missing = skills.filter(s => !s.match).map(s => s.name).join(', ');
+      const matchRate = Math.round((skills.filter(s => s.match).length / skills.length) * 100);
+      return `
+${category.toUpperCase()} (${matchRate}% match):
+${matched ? `✓ Matched Skills: ${matched}` : ''}
+${missing ? `⨯ Skills to Develop: ${missing}` : ''}`;
+    })
+    .join('\n')}
 
-${recommendations.skillGaps.length > 0 ? '\nRecommended skill improvements:\n' + recommendations.skillGaps.join('\n') : ''}
-${recommendations.strengths.length > 0 ? '\nKey strengths:\n' + recommendations.strengths.join('\n') : ''}
+${recommendations.skillGaps.length > 0 ? '\nSkill Development Priorities:\n' + recommendations.skillGaps.join('\n') : ''}
+${recommendations.strengths.length > 0 ? '\nKey Strengths:\n' + recommendations.strengths.join('\n') : ''}
+
+Recommended Actions:
+${recommendations.improvements.map(imp => `• ${imp}`).join('\n')}
+
+Resume Format Recommendations:
+${recommendations.format.map(fmt => `• ${fmt}`).join('\n')}
   `.trim();
 
   return {

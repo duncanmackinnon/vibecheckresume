@@ -92,7 +92,14 @@ export default function Page() {
       if (!response || !response.ok) {
         const status = response?.status || 'no response';
         const errorData = await response?.json().catch(() => ({ error: `HTTP error! status: ${status}` })) || { error: `HTTP error! status: ${status}` };
-        throw new Error(errorData.error || `HTTP error! status: ${status}`);
+        const errorValue = errorData.error;
+        const errorMessage =
+          typeof errorValue === 'string'
+            ? errorValue
+            : errorValue?.message
+            ? errorValue.message
+            : JSON.stringify(errorValue ?? `HTTP error! status: ${status}`);
+        throw new Error(errorMessage);
       }
 
       const contentType = response.headers.get('content-type');

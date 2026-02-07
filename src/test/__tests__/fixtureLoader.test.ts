@@ -18,6 +18,7 @@ describe('Fixture Loader', () => {
   afterEach(() => {
     cleanupTempFixtures();
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('loadFixture', () => {

@@ -1,4 +1,32 @@
-import { envVars } from '@/types/environment';
+const envVars = {
+  required: [
+    'NODE_ENV',
+    'NEXT_PUBLIC_APP_URL',
+    'DEEPSEEK_API_KEY',
+    'RATE_LIMIT',
+    'DB_HOST',
+    'DB_PORT',
+    'DB_NAME',
+    'DB_USER',
+    'DB_PASSWORD'
+  ],
+  optional: [
+    'OPENAI_ORG_ID',
+    'DB_SSL',
+    'DB_POOL_MAX',
+    'DB_POOL_IDLE_TIMEOUT',
+    'DB_CONNECTION_TIMEOUT',
+    'HEALTH_CHECK_INTERVAL',
+    'HEALTH_CHECK_TIMEOUT',
+    'LOG_LEVEL',
+    'LOG_FORMAT',
+    'CORS_ORIGIN',
+    'TRUST_PROXY',
+    'API_RATE_LIMIT',
+    'TEST_DATABASE_URL',
+    'MOCK_OPENAI_RESPONSES'
+  ]
+};
 
 export interface ValidationError {
   type: 'missing' | 'invalid';
@@ -28,6 +56,15 @@ export function validateEnvironment(): ValidationResult {
       type: 'missing',
       variables: ['DEEPSEEK_API_KEY']
     });
+  } else {
+    const key = process.env.DEEPSEEK_API_KEY;
+    const looksValid = /[0-9]/.test(key) && key.length >= 6;
+    if (!looksValid) {
+    errors.push({
+      type: 'invalid',
+      variables: ['DEEPSEEK_API_KEY']
+    });
+  }
   }
 
   // Validate numeric values

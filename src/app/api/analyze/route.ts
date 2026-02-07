@@ -149,16 +149,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
       // Attempt analysis with timeout
-      interface AnalysisResult {
-        score: number;
-        summary: string;
-        strengths: string[];
-        weaknesses: string[];
-      }
-
-      // Ensure both Promise.race parameters return the same type
       console.log('Starting analysis at', Date.now());
-      const analysisPromise: Promise<AnalysisResult> = env.api.deepseek.isConfigured
+      const analysisPromise = env.api.deepseek.isConfigured
         ? (async () => {
             console.log('Calling analyzeWithAI at', Date.now());
             const result = await analyzeWithAI(resumeText, jobDescription);
@@ -172,9 +164,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             return result;
           })();
       
-      const analysis = await Promise.race<AnalysisResult>([
+      const analysis = await Promise.race([
         analysisPromise,
-        new Promise<AnalysisResult>((_, reject) =>
+        new Promise((_, reject) =>
           setTimeout(() => {
             console.log('Timeout triggered at', Date.now());
             reject(new Error('Analysis timed out after 120 seconds'));
@@ -182,41 +174,32 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         )
       ]);
 
-      // Validate analysis result structure
-      if (
-        !analysis?.score ||
-        typeof (analysis as any).summary !== 'string' ||
-        !Array.isArray((analysis as any).strengths) ||
-        !Array.isArray((analysis as any).weaknesses)
-      ) {
-        // Attempt to map fields from the returned analysis to match AnalysisResult
-        const a: any = analysis;
-        const mapped = {
-          score: a?.score ?? 0,
-          summary: a?.detailedAnalysis ?? '',
-          strengths: a?.recommendations?.strengths ?? [],
-          weaknesses: a?.recommendations?.improvements ?? [],
-        };
-        if (
-          mapped.score &&
-          typeof mapped.summary === 'string' &&
-          Array.isArray(mapped.strengths) &&
-          Array.isArray(mapped.weaknesses)
-        ) {
-          console.warn('Analysis result did not match expected structure, but was mapped successfully.');
-          (analysis as any).summary = mapped.summary;
-          (analysis as any).strengths = mapped.strengths;
-          (analysis as any).weaknesses = mapped.weaknesses;
-        } else {
-          console.error('Invalid analysis result:', analysis);
-          throw new Error('Invalid analysis result structure');
-        }
-      }
+      // Normalize and validate analysis result structure
+      const normalized = {
+        score: typeof (analysis as any)?.score === 'number' && !Number.isNaN((analysis as any).score)
+          ? (analysis as any).score
+          : 0,
+        matchedSkills: Array.isArray((analysis as any)?.matchedSkills)
+          ? (analysis as any).matchedSkills
+          : [],
+        missingSkills: Array.isArray((analysis as any)?.missingSkills)
+          ? (analysis as any).missingSkills
+          : [],
+        recommendations: {
+          improvements: (analysis as any)?.recommendations?.improvements ?? [],
+          strengths: (analysis as any)?.recommendations?.strengths ?? [],
+          skillGaps: (analysis as any)?.recommendations?.skillGaps ?? [],
+          format: (analysis as any)?.recommendations?.format ?? [],
+        },
+        detailedAnalysis: typeof (analysis as any)?.detailedAnalysis === 'string'
+          ? (analysis as any).detailedAnalysis
+          : ((analysis as any)?.summary as string) ?? '',
+      };
 
       // Serialize response
       try {
-        const response = createResponse(analysis);
-        console.log('Analysis completed in ${Date.now() - startTime}ms');
+        const response = createResponse(normalized);
+        console.log('Analysis completed successfully');
         return response;
       } catch (serializeError) {
         console.error('Response serialization failed:', serializeError);

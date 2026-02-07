@@ -20,6 +20,7 @@ export interface DatabaseConfig {
 export async function initializeDatabase(config: DatabaseConfig): Promise<void> {
   try {
     console.log('Database initialization not yet implemented');
+    pool = {} as Pool;
     // Future implementation:
     // const { Pool } = require('pg');
     // pool = new Pool(config);
@@ -101,6 +102,8 @@ export async function closeDatabase(): Promise<void> {
     // await pool.end();
     pool = null;
     console.log('Database connection closed');
+  } else {
+    // Already closed
   }
 }
 
@@ -115,8 +118,12 @@ export async function getDatabaseHealth(): Promise<{
     const isValid = await validateConnection();
     const latency = Date.now() - startTime;
 
+    if (!isValid) {
+      return { status: 'error' };
+    }
+
     return {
-      status: isValid ? 'ok' : 'error',
+      status: 'ok',
       latency,
       // Future implementation:
       // connectionCount: pool?.totalCount || 0

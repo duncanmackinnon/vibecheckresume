@@ -106,7 +106,7 @@ function generateRecommendations(
     );
   } else if (score < 75) {
     recommendations.improvements.push(
-      "Highlight specific projects where you have applied the required skills",
+      'Highlight specific projects where you have applied the required skills',
       'Quantify your achievements with metrics and results',
       'Add more detailed examples of your technical implementations'
     );
@@ -161,9 +161,11 @@ export function analyzeResume(resumeText: string, jobDescription: string): Analy
     .filter(skill => !skill.match)
     .map(skill => skill.name);
 
-  const score = Math.round(
-    (matchedSkills.filter(skill => skill.match).length / jobSkills.length) * 100
-  );
+  const matchedCount = matchedSkills.filter(skill => skill.match).length;
+  const totalSkills = jobSkills.length;
+  const score = totalSkills > 0
+    ? Math.round((matchedCount / totalSkills) * 100)
+    : 0;
 
   const recommendations = generateRecommendations(
     missingSkills,
@@ -179,34 +181,43 @@ export function analyzeResume(resumeText: string, jobDescription: string): Analy
     return acc;
   }, {} as Record<string, typeof matchedSkills>);
 
-  const detailedAnalysis = `
-Based on the detailed analysis:
-- Overall match score: ${score}%
-- Found ${matchedSkills.filter(s => s.match).length} matching skills
-- Identified ${missingSkills.length} skill gaps
-
-Skills Analysis by Category:
-${Object.entries(skillsByCategory)
+  const categorySections = Object.entries(skillsByCategory)
     .map(([category, skills]) => {
       const matched = skills.filter(s => s.match).map(s => s.name).join(', ');
       const missing = skills.filter(s => !s.match).map(s => s.name).join(', ');
       const matchRate = Math.round((skills.filter(s => s.match).length / skills.length) * 100);
-      return `
-${category.toUpperCase()} (${matchRate}% match):
-${matched ? `✓ Matched Skills: ${matched}` : ''}
-${missing ? `⨯ Skills to Develop: ${missing}` : ''}`;
+
+      const parts = [
+        `${category.toUpperCase()} (${matchRate}% match):`,
+        matched ? `- Matched Skills: ${matched}` : '',
+        missing ? `- Skills to Develop: ${missing}` : ''
+      ].filter(Boolean);
+
+      return parts.join('\n');
     })
-    .join('\n')}
+    .join('\n');
 
-${recommendations.skillGaps.length > 0 ? '\nSkill Development Priorities:\n' + recommendations.skillGaps.join('\n') : ''}
-${recommendations.strengths.length > 0 ? '\nKey Strengths:\n' + recommendations.strengths.join('\n') : ''}
-
-Recommended Actions:
-${recommendations.improvements.map(imp => `• ${imp}`).join('\n')}
-
-Resume Format Recommendations:
-${recommendations.format.map(fmt => `• ${fmt}`).join('\n')}
-  `.trim();
+  const detailedAnalysis = [
+    'Based on the detailed analysis:',
+    `- Overall match score: ${score}%`,
+    `- Found ${matchedSkills.filter(s => s.match).length} matching skills`,
+    `- Identified ${missingSkills.length} skill gaps`,
+    '',
+    'Skills Analysis by Category:',
+    categorySections,
+    recommendations.skillGaps.length > 0
+      ? ['','Skill Development Priorities:', ...recommendations.skillGaps].join('\n')
+      : '',
+    recommendations.strengths.length > 0
+      ? ['','Key Strengths:', ...recommendations.strengths].join('\n')
+      : '',
+    '',
+    'Recommended Actions:',
+    recommendations.improvements.map(imp => `- ${imp}`).join('\n'),
+    '',
+    'Resume Format Recommendations:',
+    recommendations.format.map(fmt => `- ${fmt}`).join('\n')
+  ].filter(Boolean).join('\n');
 
   return {
     score,

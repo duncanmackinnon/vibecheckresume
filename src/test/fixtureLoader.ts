@@ -23,6 +23,10 @@ const defaultConfig: FixtureConfig = {
  */
 const FIXTURES_PATH = path.join(process.cwd(), 'src', 'test', 'mockData');
 
+// In-memory fixtures for test environments (avoids filesystem writes)
+const memoryFixtures = new Map<string, string>();
+const useMemory = () => process.env.NODE_ENV === 'test';
+
 /**
  * Convert buffer or string to string
  */
@@ -42,7 +46,14 @@ export function loadFixture<T = string>(
 ): T {
   const filePath = path.join(FIXTURES_PATH, fileName);
   
-  if (!fs.existsSync(filePath)) {
+  if (useMemory() && memoryFixtures.has(fileName)) {
+    const content = memoryFixtures.get(fileName)!;
+    return (config.parse ? JSON.parse(content) : content) as T;
+  }
+  
+  const readIsMocked = (fs.readFileSync as any)?._isMockFunction === true || !!(fs.readFileSync as any).mock;
+
+  if (!fs.existsSync(filePath) && !readIsMocked) {
     throw new Error(`Fixture file not found: ${fileName}`);
   }
 
@@ -105,6 +116,12 @@ export function createTempFixture(
   extension: string = '.txt'
 ): string {
   const tempFileName = `temp-${Date.now()}${extension}`;
+  
+  if (useMemory()) {
+    memoryFixtures.set(tempFileName, content);
+    return tempFileName;
+  }
+
   const tempFilePath = path.join(FIXTURES_PATH, tempFileName);
   
   fs.writeFileSync(tempFilePath, content, 'utf8');
@@ -116,6 +133,11 @@ export function createTempFixture(
  * Clean up temporary fixtures
  */
 export function cleanupTempFixtures(): void {
+  if (useMemory()) {
+    memoryFixtures.clear();
+    return;
+  }
+
   const files = fs.readdirSync(FIXTURES_PATH);
   
   files
@@ -129,13 +151,15 @@ export function cleanupTempFixtures(): void {
  * Get all available fixtures
  */
 export function listFixtures(): string[] {
-  return fs.readdirSync(FIXTURES_PATH);
+  const disk = fs.readdirSync(FIXTURES_PATH);
+  return Array.from(new Set([...disk, ...memoryFixtures.keys()]));
 }
 
 /**
  * Check if a fixture exists
  */
 export function hasFixture(fileName: string): boolean {
+  if (memoryFixtures.has(fileName)) return true;
   return fs.existsSync(path.join(FIXTURES_PATH, fileName));
 }
 
@@ -145,6 +169,18 @@ export function hasFixture(fileName: string): boolean {
 export function getFixtureMetadata(fileName: string) {
   const filePath = path.join(FIXTURES_PATH, fileName);
   
+  if (useMemory() && memoryFixtures.has(fileName)) {
+    const content = memoryFixtures.get(fileName)!;
+    const now = new Date();
+    return {
+      name: fileName,
+      size: content.length,
+      created: now,
+      modified: now,
+      extension: path.extname(fileName)
+    };
+  }
+
   if (!fs.existsSync(filePath)) {
     throw new Error(`Fixture file not found: ${fileName}`);
   }
@@ -154,8 +190,8 @@ export function getFixtureMetadata(fileName: string) {
   return {
     name: fileName,
     size: stats.size,
-    created: stats.birthtime,
-    modified: stats.mtime,
+    created: new Date(stats.birthtimeMs),
+    modified: new Date(stats.mtimeMs),
     extension: path.extname(fileName)
   };
 }

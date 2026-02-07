@@ -1,6 +1,56 @@
+import 'openai/shims/node';
 import '@testing-library/jest-dom';
-import 'whatwg-fetch';
+import React from 'react';
 import { TextDecoder, TextEncoder } from 'util';
+// Robust Web Fetch polyfill for NextRequest/openai shims
+(() => {
+  const g: any = global;
+  try {
+    // Provided by Next's edge-runtime build
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const edgeFetch = require('next/dist/compiled/@edge-runtime/primitives/fetch');
+    g.fetch = g.fetch || edgeFetch.fetch;
+    g.Headers = g.Headers || edgeFetch.Headers;
+    g.Request = g.Request || edgeFetch.Request;
+    g.Response = g.Response || edgeFetch.Response;
+    g.FormData = g.FormData || edgeFetch.FormData;
+  } catch (_) {
+    if (!g.fetch && typeof fetch !== 'undefined') g.fetch = fetch;
+    if (!g.Headers && typeof Headers !== 'undefined') g.Headers = Headers;
+    if (!g.Request && typeof Request !== 'undefined') g.Request = Request;
+    if (!g.Response && typeof Response !== 'undefined') g.Response = Response;
+    if (!g.FormData && typeof FormData !== 'undefined') g.FormData = FormData;
+  }
+
+  // Final fallback simple implementations to satisfy NextRequest if still missing
+  if (!g.Request) {
+    g.Request = class {
+      url: string;
+      method: string;
+      headers: any;
+      constructor(input: any, init: any = {}) {
+        this.url = typeof input === 'string' ? input : input?.url || '';
+        this.method = init.method || 'GET';
+        this.headers = init.headers || {};
+      }
+    };
+  }
+  if (!g.Response) {
+    g.Response = class {
+      status: number;
+      headers: any;
+      body: any;
+      constructor(body?: any, init: any = {}) {
+        this.status = init.status || 200;
+        this.headers = init.headers || {};
+        this.body = body;
+      }
+      json() {
+        return Promise.resolve(this.body ?? {});
+      }
+    };
+  }
+})();
 
 // Mock TextEncoder/TextDecoder
 global.TextEncoder = TextEncoder;
@@ -30,8 +80,15 @@ class MockResizeObserver {
 
 global.ResizeObserver = MockResizeObserver as any;
 
-// Mock fetch
+// Mock fetch (spy-friendly)
 global.fetch = jest.fn();
+
+// Mock react-markdown (ESM) to avoid transformer issues in Jest
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', null, children)
+}));
 
 // Mock console methods but keep them functional for debugging
 const originalConsole = { ...console };

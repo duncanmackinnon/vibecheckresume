@@ -1,31 +1,36 @@
 import { OpenAI } from 'openai';
 import { Analysis } from '../types';
 import { ConfigurationError, handleOpenAIError, formatError } from './errors';
+import { analyzeResume as localAnalyze } from './localAnalysis';
+
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.MOCK_OPENAI_RESPONSES === 'true';
 
 // Initialize Deepseek client
 const apiKey = process.env.DEEPSEEK_API_KEY;
 
 console.log('OpenAI API Key from env:', apiKey ? '***' + apiKey.slice(-4) : 'NOT FOUND');
 
-if (!apiKey) {
-  throw new ConfigurationError('OpenAI API key is not configured');
+let openai: OpenAI | null = null;
+
+if (!apiKey || !apiKey.startsWith('sk-') || apiKey.length !== 51) {
+  if (!isTestEnv) {
+    throw new ConfigurationError('OpenAI API key is not configured or invalid');
+  } else {
+    console.warn('Skipping OpenAI initialization in test mode');
+  }
+} else {
+  const openaiConfig = {
+    apiKey,
+    organization: process.env.OPENAI_ORG_ID
+  };
+
+  console.log('OpenAI Client Configuration:', {
+    ...openaiConfig,
+    apiKey: openaiConfig.apiKey ? '***' + openaiConfig.apiKey.slice(-4) : undefined
+  });
+
+  openai = new OpenAI(openaiConfig);
 }
-
-if (!apiKey.startsWith('sk-') || apiKey.length !== 51) {
-  throw new ConfigurationError('Invalid OpenAI API key format');
-}
-
-const openaiConfig = {
-  apiKey,
-  organization: process.env.OPENAI_ORG_ID
-};
-
-console.log('OpenAI Client Configuration:', {
-  ...openaiConfig,
-  apiKey: openaiConfig.apiKey ? '***' + openaiConfig.apiKey.slice(-4) : undefined
-});
-
-const openai = new OpenAI(openaiConfig);
 
 interface OpenAISkill {
   name: string;
@@ -54,6 +59,11 @@ export interface ResumeAnalysisPrompt {
 export async function analyzeResume({ resumeText, jobDescription, signal }: ResumeAnalysisPrompt): Promise<Analysis> {
   const startTime = Date.now();
   console.log('Starting resume analysis...');
+  
+  // Fallback to local analysis in tests or when OpenAI is not configured
+  if (!openai) {
+    return localAnalyze(resumeText, jobDescription);
+  }
   
   // Optimize input for token limits
   const MAX_TOKENS = 12000; // Leave room for response

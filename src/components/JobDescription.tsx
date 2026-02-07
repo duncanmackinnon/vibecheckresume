@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/app/lib/utils';
 
 export interface JobDescriptionProps {
-  onJobDescriptionSubmit: (jobDescription: File) => void;
+  onJobDescriptionSubmit: (jobDescription: string) => void;
   isDisabled?: boolean;
 }
 
@@ -18,12 +18,9 @@ export default function JobDescription({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (file) {
-      onJobDescriptionSubmit(file);
+      onJobDescriptionSubmit(file.name);
     } else if (description.trim()) {
-      // Create a File object from the text input
-      const blob = new Blob([description], { type: 'text/plain' });
-      const textFile = new File([blob], 'job-description.txt', { type: 'text/plain' });
-      onJobDescriptionSubmit(textFile);
+      onJobDescriptionSubmit(description.trim());
     }
   };
 

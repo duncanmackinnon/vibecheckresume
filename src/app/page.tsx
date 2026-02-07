@@ -132,12 +132,13 @@ export default function Page() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md transition-all hover:shadow-lg">
           <div key="file-container" className="space-y-1">
-            <label className="block text-sm font-medium text-gray-700">
-              Upload Resume (PDF)
+            <label htmlFor="resume-upload" className="block text-sm font-medium text-gray-700">
+              Upload Resume
             </label>
             <input
               type="file"
               accept="application/pdf"
+              id="resume-upload"
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
               onChange={(e) => {
                 const selectedFile = e.target.files?.[0];
@@ -173,7 +174,7 @@ export default function Page() {
             className="w-full p-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 disabled:opacity-50 disabled:transform-none flex items-center justify-center gap-2"
           >
             {loading && <LoadingSpinner key="spinner" />}
-            <span key="label">{loading ? 'Analyzing...' : 'Analyze Resume'}</span>
+            {loading ? 'Analyzing...' : 'Analyze Resume'}
           </button>
         </form>
 

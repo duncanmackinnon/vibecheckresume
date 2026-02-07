@@ -71,7 +71,7 @@ export default function FileUpload({ onFileUpload }: FileUploadProps) {
             />
           </svg>
           <p className="text-gray-600">
-            Drag and drop your resume here, or click to select
+            Drag and drop your resume here
           </p>
           <p className="text-sm text-gray-500">PDF or TXT files only</p>
         </div>

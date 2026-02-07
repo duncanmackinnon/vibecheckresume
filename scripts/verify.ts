@@ -31,12 +31,13 @@ async function runVerification() {
 
   // Check required files
   const requiredFiles = [
-    '.env',
     'package.json',
     'next.config.js',
     'tsconfig.json',
     'src/app/page.tsx',
-    'src/app/api/analyze/route.ts'
+    'src/app/api/analyze/route.ts',
+    // .env is only required locally; Vercel/CI use env vars
+    ...(process.env.CI || process.env.VERCEL ? [] : ['.env'])
   ];
 
   for (const file of requiredFiles) {

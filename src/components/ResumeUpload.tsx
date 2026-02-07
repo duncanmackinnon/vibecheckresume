@@ -54,10 +54,10 @@ export default function ResumeUpload() {
 
   const [prevInputs, setPrevInputs] = useState({
     file: null as File | null,
-    jobDescriptionFile: null as File | null
+    jobDescription: '' as string
   });
 
-  const handleSubmit = async (jobDescriptionFile: File) => {
+  const handleSubmit = async (jobDescription: string) => {
     if (!isEnvironmentValid || !file) {
       setError('Application is not properly configured. Please try again later.');
       setIsLoading(false);
@@ -65,9 +65,9 @@ export default function ResumeUpload() {
     }
 
     // Reset analysis if inputs changed
-    if (file !== prevInputs.file || jobDescriptionFile !== prevInputs.jobDescriptionFile) {
+    if (file !== prevInputs.file || jobDescription !== prevInputs.jobDescription) {
       setAnalysis(null);
-      setPrevInputs({ file, jobDescriptionFile });
+      setPrevInputs({ file, jobDescription });
     }
 
     setError(null);
@@ -126,7 +126,10 @@ export default function ResumeUpload() {
     // Prepare form data with validated content
     const formData = new FormData();
     formData.append('resume', analysisContent);
-    formData.append('jobDescription', jobDescriptionFile);
+    formData.append(
+      'jobDescription',
+      new File([jobDescription], 'jobDescription.txt', { type: 'text/plain' })
+    );
     formData.append('originalFormat', file.type);
     formData.append('contentType', analysisContent.type);
 

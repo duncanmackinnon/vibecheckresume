@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Analysis } from './types';
 
 function LoadingSpinner({ className = '', progress, ...props }: { className?: string; progress?: number }) {
@@ -44,7 +45,11 @@ export default function Page() {
   const [jobDescription, setJobDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch('/result');
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,46 +57,21 @@ export default function Page() {
 
     setLoading(true);
     setError('');
-    setAnalysis(null);
-
     try {
-      // Create FormData with sanitized inputs
       const formData = new FormData();
       formData.append('resume', sanitizeFile(file));
-      
-      // Create a text file for job description
       const jobDescriptionBlob = new Blob([jobDescription.trim()], { type: 'text/plain' });
       formData.append('jobDescription', jobDescriptionBlob, 'jobDescription.txt');
 
-      // Send request with retry logic
-      let response: Response | null = null;
-      let retries = 3;
-      
-      while (retries > 0) {
-        try {
-          response = await fetch('/api/analyze', {
-            method: 'POST',
-            body: formData,
-            headers: {
-              'Accept': 'application/json',
-            },
-          });
-          break;
-        } catch (error) {
-          retries--;
-          if (retries === 0) throw error;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        body: formData,
+        headers: { Accept: 'application/json' },
+      });
 
-      if (!response) {
-        throw new Error('Failed to connect to server');
-      }
-
-      // Check for response validity
-      if (!response || !response.ok) {
-        const status = response?.status || 'no response';
-        const errorData = await response?.json().catch(() => ({ error: `HTTP error! status: ${status}` })) || { error: `HTTP error! status: ${status}` };
+      if (!response.ok) {
+        const status = response.status;
+        const errorData = await response.json().catch(() => ({ error: `HTTP error! status: ${status}` })) || { error: `HTTP error! status: ${status}` };
         const errorValue = errorData.error;
         const errorMessage =
           typeof errorValue === 'string'
@@ -108,37 +88,48 @@ export default function Page() {
       }
 
       const data = await response.json();
-      
-      // Validate response structure
       if (!data || typeof data.score !== 'number' || !Array.isArray(data.matchedSkills)) {
         throw new Error('Invalid analysis result structure');
       }
 
-      setAnalysis(data);
+      // Save locally and navigate to dedicated results page
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('latestAnalysis', JSON.stringify(data));
+      }
+      router.push('/result');
+      return; // keep loading true until route changes
     } catch (err) {
       console.error('Analysis error:', err);
       setError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 p-8">
-      <div className="max-w-2xl mx-auto space-y-8">
-        {/* Header */}
-        <div key="header" className="text-center space-y-2 animate-fade-in">
+      {loading && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4 bg-white/10 text-white px-10 py-8 rounded-2xl border border-white/20 shadow-2xl">
+            <div className="h-24 w-24 rounded-full border-8 border-white/25 border-t-indigo-400 animate-spin" style={{ animationDuration: '1.5s' }} />
+            <div className="text-center space-y-1">
+              <p className="text-lg font-semibold">Analyzing with AI...</p>
+              <p className="text-sm text-slate-200">Hang tight—this can take a bit.</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="max-w-6xl mx-auto space-y-8">
+        <div className="text-center space-y-2 animate-fade-in">
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
             Resume Match Analyzer
           </h1>
           <p className="text-gray-600">
-            Get instant feedback on how well your resume matches job requirements
+            Get detailed feedback on how well your resume matches job requirements
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-xl shadow-md transition-all hover:shadow-lg">
-          <div key="file-container" className="space-y-1">
+          <div className="space-y-1">
             <label htmlFor="resume-upload" className="block text-sm font-medium text-gray-700">
               Upload Resume
             </label>
@@ -151,14 +142,14 @@ export default function Page() {
                 const selectedFile = e.target.files?.[0];
                 if (selectedFile) {
                   setFile(selectedFile);
-                  setError(''); // Clear any previous errors
+                  setError('');
                 }
               }}
               disabled={loading}
             />
           </div>
 
-          <div key="textarea-container" className="space-y-1">
+          <div className="space-y-1">
             <label className="block text-sm font-medium text-gray-700">
               Job Description
             </label>
@@ -169,7 +160,7 @@ export default function Page() {
               value={jobDescription}
               onChange={(e) => {
                 setJobDescription(e.target.value);
-                setError(''); // Clear any previous errors
+                setError('');
               }}
               disabled={loading}
             />
@@ -185,148 +176,7 @@ export default function Page() {
           </button>
         </form>
 
-        {/* Error message */}
         {error && <ErrorDisplay message={error} />}
-
-        {/* Results */}
-        {analysis && !error && (
-          <div key="result" className="mt-6 bg-white p-8 rounded-xl shadow-lg space-y-8 animate-fade-in">
-            {/* Score */}
-            <div key="score" className="text-center">
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">Match Score</h2>
-              <div className={`text-5xl font-bold ${
-                analysis.score >= 70 ? 'text-green-500' :
-                analysis.score >= 50 ? 'text-yellow-500' : 'text-red-500'
-              }`}>
-                {analysis.score}%
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                <div
-                  className={`${
-                    analysis.score >= 70 ? 'bg-green-500' :
-                    analysis.score >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                  } h-2.5 rounded-full transition-all duration-1000 ease-out`}
-                  style={{ width: `${analysis.score}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Analysis sections */}
-            <div key="analysis-sections" className="space-y-6">
-              {/* Matched Skills */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                  Matched Skills
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {analysis.matchedSkills
-                    .filter(skill => skill.match)
-                    .map((skill, i) => (
-                      <span
-                        key={i}
-                        className="bg-green-100 text-green-800 text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center"
-                      >
-                        <svg className="w-3 h-3 mr-1.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                          <path
-                            fillRule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                        {skill.name}
-                      </span>
-                    ))}
-                </div>
-              </div>
-
-              {/* Missing Skills */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                  Skills to Improve
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {analysis.missingSkills.map((skill, i) => (
-                    <span
-                      key={i}
-                      className="bg-red-100 text-red-800 text-sm font-medium px-2.5 py-0.5 rounded-full flex items-center"
-                    >
-                      <svg className="w-3 h-3 mr-1.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path
-                          fillRule="evenodd"
-                          d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Recommendations */}
-              {analysis.recommendations?.improvements?.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                    Recommended Improvements
-                  </h3>
-                  <div className="space-y-3">
-                    {analysis.recommendations.improvements.map((improvement, i) => (
-                      <div key={i} className="p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded-r">
-                        <div className="flex items-start">
-                          <svg className="w-5 h-5 text-yellow-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span className="text-gray-700">{improvement}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Format Suggestions */}
-              {analysis.recommendations?.format?.length > 0 && (
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                    Format Suggestions
-                  </h3>
-                  <div className="space-y-3">
-                    {analysis.recommendations.format.map((format, i) => (
-                      <div key={i} className="p-3 bg-blue-50 border-l-4 border-blue-400 rounded-r">
-                        <div className="flex items-start">
-                          <svg className="w-5 h-5 text-blue-500 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                            <path
-                              fillRule="evenodd"
-                              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span className="text-gray-700">{format}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Detailed Analysis */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3 text-gray-800">
-                  Detailed Analysis
-                </h3>
-                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-gray-700 whitespace-pre-wrap">
-                    {analysis.detailedAnalysis}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

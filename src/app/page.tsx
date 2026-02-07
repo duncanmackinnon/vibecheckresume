@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Analysis } from './types';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function LoadingSpinner({ className = '', progress, ...props }: { className?: string; progress?: number }) {
   return (
     <div className={`relative inline-flex items-center justify-center ${className}`} {...props}>

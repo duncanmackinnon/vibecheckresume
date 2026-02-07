@@ -29,13 +29,13 @@ const markdownComponents = {
   p: (props: React.HTMLProps<HTMLParagraphElement>) => (
     <p className="text-sm leading-6 text-slate-700 mt-2" {...props} />
   ),
-  ul: (props: React.HTMLProps<HTMLUListElement>) => (
+  ul: (props: React.HTMLAttributes<HTMLUListElement>) => (
     <ul className="list-disc list-inside space-y-1 text-sm text-slate-700 mt-2" {...props} />
   ),
-  ol: (props: React.HTMLProps<HTMLOListElement>) => (
+  ol: (props: React.OlHTMLAttributes<HTMLOListElement>) => (
     <ol className="list-decimal list-inside space-y-1 text-sm text-slate-700 mt-2" {...props} />
   ),
-  li: (props: React.HTMLProps<HTMLLIElement>) => (
+  li: (props: React.LiHTMLAttributes<HTMLLIElement>) => (
     <li className="text-sm leading-6 text-slate-700" {...props} />
   )
 };

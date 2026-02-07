@@ -6,6 +6,9 @@ import type { Analysis } from '../types';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default function ResultPage() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const router = useRouter();

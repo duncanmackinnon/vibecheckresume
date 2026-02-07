@@ -10,8 +10,10 @@ import { extractPdfText } from '@/app/lib/pdfUtils';
 import { logRequest, logResponse } from './middleware';
 import { env } from '@/utils/env';
 
+// Force Serverless runtime (not Edge) so Vercel honors extended timeouts / Fluid compute.
+export const runtime = 'nodejs';
+export const maxDuration = 300; // hobby+fluid allows up to 300s; ignored otherwise
 export const dynamic = 'force-dynamic';
-export const maxDuration = 10; // Matches Vercel's 10s timeout limit
 export const fetchCache = 'force-no-store';
 
 function sanitizeError(error: unknown): string {
@@ -148,8 +150,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
-      // Attempt analysis with timeout
+      // Attempt analysis with timeout. On Hobby w/Fluid, allow up to 300s; otherwise Vercel will cap earlier.
+      const ANALYSIS_TIMEOUT_MS = 280_000; // slightly under 300s ceiling
+
       console.log('Starting analysis at', Date.now());
+
+      const runLocal = async () => {
+        console.log('Calling localAnalyze at', Date.now());
+        const result = await localAnalyze(resumeText, jobDescription);
+        console.log('localAnalyze resolved at', Date.now());
+        return result;
+      };
+
       const analysisPromise = env.api.deepseek.isConfigured
         ? (async () => {
             console.log('Calling analyzeWithAI at', Date.now());
@@ -157,21 +169,16 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             console.log('analyzeWithAI resolved at', Date.now());
             return result;
           })()
-        : (async () => {
-            console.log('Calling localAnalyze at', Date.now());
-            const result = await localAnalyze(resumeText, jobDescription);
-            console.log('localAnalyze resolved at', Date.now());
-            return result;
-          })();
+        : runLocal();
       
       const analysis = await Promise.race([
         analysisPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => {
-            console.log('Timeout triggered at', Date.now());
-            reject(new Error('Analysis timed out after 120 seconds'));
-          }, 120000)
-        )
+        new Promise(async (resolve) => {
+          setTimeout(async () => {
+            console.log('Timeout triggered at', Date.now(), 'falling back to local analysis');
+            resolve(await runLocal());
+          }, ANALYSIS_TIMEOUT_MS);
+        })
       ]);
 
       // Normalize and validate analysis result structure

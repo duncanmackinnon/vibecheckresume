@@ -13,7 +13,7 @@
     "analyze": "tsx scripts/analyze-project.ts",
     "analyze:full": "ANALYSIS_QUALITY=true npm run analyze",
     "test:watch": "jest --watch",
-    "test:ci": "jest --ci --coverage",
+    "test:ci": "jest --ci --coverage --runInBand",
     "test:openai": "ts-node -r dotenv/config scripts/test-openai.ts",
     "test:errors": "ts-node -r dotenv/config scripts/test-errors.ts",
     "test:fixtures": "jest src/test/__tests__/",

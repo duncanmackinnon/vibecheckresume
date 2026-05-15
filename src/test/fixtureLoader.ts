@@ -25,7 +25,8 @@ const FIXTURES_PATH = path.join(process.cwd(), 'src', 'test', 'mockData');
 
 // In-memory fixtures for test environments (avoids filesystem writes)
 const memoryFixtures = new Map<string, string>();
-const useMemory = () => process.env.NODE_ENV === 'test';
+const shouldUseMemoryFixtures = () => process.env.NODE_ENV === 'test';
+let tempFixtureCounter = 0;
 
 /**
  * Convert buffer or string to string
@@ -46,7 +47,7 @@ export function loadFixture<T = string>(
 ): T {
   const filePath = path.join(FIXTURES_PATH, fileName);
   
-  if (useMemory() && memoryFixtures.has(fileName)) {
+  if (shouldUseMemoryFixtures() && memoryFixtures.has(fileName)) {
     const content = memoryFixtures.get(fileName)!;
     return (config.parse ? JSON.parse(content) : content) as T;
   }
@@ -115,9 +116,9 @@ export function createTempFixture(
   content: string,
   extension: string = '.txt'
 ): string {
-  const tempFileName = `temp-${Date.now()}${extension}`;
+  const tempFileName = `temp-${Date.now()}${++tempFixtureCounter}${extension}`;
   
-  if (useMemory()) {
+  if (shouldUseMemoryFixtures()) {
     memoryFixtures.set(tempFileName, content);
     return tempFileName;
   }
@@ -133,7 +134,7 @@ export function createTempFixture(
  * Clean up temporary fixtures
  */
 export function cleanupTempFixtures(): void {
-  if (useMemory()) {
+  if (shouldUseMemoryFixtures()) {
     memoryFixtures.clear();
     return;
   }
@@ -169,7 +170,7 @@ export function hasFixture(fileName: string): boolean {
 export function getFixtureMetadata(fileName: string) {
   const filePath = path.join(FIXTURES_PATH, fileName);
   
-  if (useMemory() && memoryFixtures.has(fileName)) {
+  if (shouldUseMemoryFixtures() && memoryFixtures.has(fileName)) {
     const content = memoryFixtures.get(fileName)!;
     const now = new Date();
     return {

@@ -15,22 +15,22 @@ const mockProps = {
 test('displays analysis results correctly', () => {
   render(<AnalysisResult {...mockProps} />);
   
-  expect(screen.getByText('75% Match')).toBeInTheDocument();
+  expect(screen.getByText('75%')).toBeInTheDocument();
   expect(screen.getByText('React')).toBeInTheDocument();
   expect(screen.getByText('TypeScript')).toBeInTheDocument();
   expect(screen.getByText('Limited backend experience')).toBeInTheDocument();
   expect(screen.getByText('Node.js')).toBeInTheDocument();
   expect(screen.getByText('Add more project details')).toBeInTheDocument();
-  expect(screen.getByText('Your resume shows strong frontend skills')).toBeInTheDocument();
+  expect(screen.getAllByText(/Your resume shows strong frontend skills/).length).toBeGreaterThan(0);
 });
 
 test('renders different score colors correctly', () => {
   const { rerender } = render(<AnalysisResult {...mockProps} matchScore={85} />);
-  expect(screen.getByText('85% Match')).toHaveClass('text-green-600');
+  expect(screen.getByText('85%')).toHaveClass('text-green-700');
 
   rerender(<AnalysisResult {...mockProps} matchScore={65} />);
-  expect(screen.getByText('65% Match')).toHaveClass('text-yellow-600');
+  expect(screen.getByText('65%')).toHaveClass('text-amber-700');
 
   rerender(<AnalysisResult {...mockProps} matchScore={45} />);
-  expect(screen.getByText('45% Match')).toHaveClass('text-red-600');
+  expect(screen.getByText('45%')).toHaveClass('text-rose-700');
 });

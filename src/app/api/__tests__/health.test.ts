@@ -17,6 +17,7 @@ describe('Health Check API', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (fs.existsSync as jest.Mock).mockReturnValue(true);
+    (fs.accessSync as jest.Mock).mockReturnValue(undefined);
     (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
     (validateApiKey as jest.Mock).mockReturnValue(true);
     jest.spyOn(Date, 'now').mockReturnValue(mockTime);
@@ -118,7 +119,7 @@ describe('Health Check API', () => {
       });
     });
 
-    it('should return error status when OpenAI is down', async () => {
+    it('should return error status when DeepSeek is down', async () => {
       (validateApiKey as jest.Mock).mockReturnValue(false);
       
       const request = new NextRequest('http://localhost/api/health');
@@ -127,7 +128,7 @@ describe('Health Check API', () => {
 
       expect(response.status).toBe(503);
       expect(data.status).toBe('error');
-      expect(data.services.openai).toBe(false);
+      expect(data.services.deepseek).toBe(false);
     });
 
     it('should return error status when filesystem is inaccessible', async () => {
@@ -154,7 +155,7 @@ describe('Health Check API', () => {
     });
 
     it('should handle unexpected errors gracefully', async () => {
-      (fs.readFileSync as jest.Mock).mockImplementation(() => {
+      (validateApiKey as jest.Mock).mockImplementation(() => {
         throw new Error('Unexpected error');
       });
 

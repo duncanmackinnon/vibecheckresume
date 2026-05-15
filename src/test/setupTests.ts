@@ -7,7 +7,6 @@ import { TextDecoder, TextEncoder } from 'util';
   const g: any = global;
   try {
     // Provided by Next's edge-runtime build
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const edgeFetch = require('next/dist/compiled/@edge-runtime/primitives/fetch');
     g.fetch = g.fetch || edgeFetch.fetch;
     g.Headers = g.Headers || edgeFetch.Headers;
@@ -25,13 +24,23 @@ import { TextDecoder, TextEncoder } from 'util';
   // Final fallback simple implementations to satisfy NextRequest if still missing
   if (!g.Request) {
     g.Request = class {
-      url: string;
-      method: string;
-      headers: any;
       constructor(input: any, init: any = {}) {
-        this.url = typeof input === 'string' ? input : input?.url || '';
-        this.method = init.method || 'GET';
-        this.headers = init.headers || {};
+        const headers = g.Headers ? new g.Headers(init.headers || {}) : init.headers || {};
+        Object.defineProperty(this, 'url', {
+          value: typeof input === 'string' ? input : input?.url || '',
+          configurable: true,
+          enumerable: true
+        });
+        Object.defineProperty(this, 'method', {
+          value: init.method || 'GET',
+          configurable: true,
+          enumerable: true
+        });
+        Object.defineProperty(this, 'headers', {
+          value: headers,
+          configurable: true,
+          enumerable: true
+        });
       }
     };
   }
@@ -46,7 +55,14 @@ import { TextDecoder, TextEncoder } from 'util';
         this.body = body;
       }
       json() {
+        if (typeof this.body === 'string') {
+          return Promise.resolve(JSON.parse(this.body));
+        }
+
         return Promise.resolve(this.body ?? {});
+      }
+      text() {
+        return Promise.resolve(typeof this.body === 'string' ? this.body : JSON.stringify(this.body ?? ''));
       }
     };
   }
@@ -88,6 +104,21 @@ jest.mock('react-markdown', () => ({
   __esModule: true,
   default: ({ children }: { children: React.ReactNode }) =>
     React.createElement('div', null, children)
+}));
+
+jest.mock('next/navigation', () => ({
+  __esModule: true,
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn(),
+    back: jest.fn(),
+    forward: jest.fn(),
+    refresh: jest.fn()
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({})
 }));
 
 // Mock console methods but keep them functional for debugging

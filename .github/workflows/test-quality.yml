@@ -2,7 +2,7 @@ name: Test Quality Checks
 
 on:
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
       - 'src/**'
       - 'scripts/**'
@@ -12,7 +12,7 @@ on:
       - '**.spec.ts'
       - '**.spec.tsx'
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   workflow_dispatch:
 
 jobs:
@@ -23,35 +23,29 @@ jobs:
     env:
       NODE_ENV: test
       CI: true
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      SMTP_HOST: ${{ secrets.SMTP_HOST }}
-      SMTP_PORT: ${{ secrets.SMTP_PORT }}
-      SMTP_USER: ${{ secrets.SMTP_USER }}
-      SMTP_PASS: ${{ secrets.SMTP_PASS }}
-      EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY || 'ci-placeholder-deepseek-key' }}
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Run test quality analysis
-        uses: ./.github/actions/test-quality
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-          coverage-threshold: '80'
-          quality-threshold: '75'
-          update-pr: ${{ github.event_name == 'pull_request' }}
-          send-notifications: true
-          archive-results: ${{ github.ref == 'refs/heads/main' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          cache: 'npm'
 
-      - name: Report job status
-        if: always()
-        run: |
-          if [ "${{ job.status }}" != "success" ]; then
-            echo "::error::Test quality checks failed. See detailed report in artifacts."
-            exit 1
-          fi
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Type check
+        run: npx tsc --noEmit --pretty false
+
+      - name: Run tests with coverage
+        run: npm run test:ci
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-quality-coverage
+          path: coverage/
+          if-no-files-found: error

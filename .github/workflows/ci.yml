@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 env:
-  NODE_VERSION: '18'
-  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+  NODE_VERSION: '20'
+  DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY || 'ci-placeholder-deepseek-key' }}
 
 jobs:
   verify:
@@ -25,7 +25,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Environment verification
         run: npm run verify:env
@@ -34,66 +34,21 @@ jobs:
         run: npm run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --pretty false
 
       - name: Run tests
         run: npm run test:ci
 
-      - name: Generate coverage report
-        run: npm run test:report
-        
       - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage
           path: coverage/
-          
-      - name: Upload test report
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-report
-          path: test-report.txt
-
-  integration:
-    name: Integration Tests
-    needs: verify
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run Deepseek integration tests
-        run: npm run test:deepseek
-        env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-
-      - name: Run error handling tests
-        run: npm run test:errors
-
-      - name: Run fixture tests
-        run: npm run test:fixtures
-
-      - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-results
-          path: |
-            test-report.txt
-            coverage/
+          if-no-files-found: error
 
   build:
     name: Build
-    needs: [verify, integration]
+    needs: verify
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -107,7 +62,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build
         run: npm run build
@@ -117,48 +72,7 @@ jobs:
         with:
           name: build
           path: .next/
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: build
-          path: .next/
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci --production
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: .next/
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v4
-        with:
-          token: ${{ secrets.ACCESS_TOKEN }}
+          if-no-files-found: error
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

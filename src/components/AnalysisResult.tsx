@@ -119,9 +119,9 @@ export default function AnalysisResult({
               <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600 text-white text-sm font-semibold">
-                    ★
+                    ✦
                   </span>
-                  <h3 className="text-lg font-semibold text-slate-900">Recommendations</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">Next Actions</h3>
                 </div>
                 <ul className="space-y-2 text-sm text-slate-800 list-disc list-inside">
                   {recommendations.map((rec, idx) => (

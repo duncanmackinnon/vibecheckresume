@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWithAI } from '@/app/lib/deepseekEnhancer';
-import { analyzeResume as localAnalyze } from '@/app/lib/localAnalysis';
-import {
-  validateResume,
-  validateJobDescription,
-  ValidationError
-} from '@/app/lib/errors';
 import { extractPdfText } from '@/app/lib/pdfUtils';
 import { logRequest, logResponse } from './middleware';
 import { env } from '@/utils/env';
@@ -150,53 +144,85 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     try {
+      if (!env.api.deepseek.isConfigured) {
+        return createErrorResponse(
+          'AI analysis is not configured. Set DEEPSEEK_API_KEY before running analysis.',
+          500
+        );
+      }
+
       // Attempt analysis with timeout. On Hobby w/Fluid, allow up to 300s; otherwise Vercel will cap earlier.
       const ANALYSIS_TIMEOUT_MS = 280_000; // slightly under 300s ceiling
 
       console.log('Starting analysis at', Date.now());
 
-      const runLocal = async () => {
-        console.log('Calling localAnalyze at', Date.now());
-        const result = await localAnalyze(resumeText, jobDescription);
-        console.log('localAnalyze resolved at', Date.now());
+      const analysisPromise = (async () => {
+        console.log('Calling analyzeWithAI at', Date.now());
+        const result = await analyzeWithAI(resumeText, jobDescription);
+        console.log('analyzeWithAI resolved at', Date.now());
         return result;
-      };
+      })();
 
-      const analysisPromise = env.api.deepseek.isConfigured
-        ? (async () => {
-            console.log('Calling analyzeWithAI at', Date.now());
-            const result = await analyzeWithAI(resumeText, jobDescription);
-            console.log('analyzeWithAI resolved at', Date.now());
-            return result;
-          })()
-        : runLocal();
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          console.log('AI analysis timeout triggered at', Date.now());
+          reject(new Error('AI analysis timed out. Please try again.'));
+        }, ANALYSIS_TIMEOUT_MS);
+      });
       
       const analysis = await Promise.race([
         analysisPromise,
-        new Promise(async (resolve) => {
-          setTimeout(async () => {
-            console.log('Timeout triggered at', Date.now(), 'falling back to local analysis');
-            resolve(await runLocal());
-          }, ANALYSIS_TIMEOUT_MS);
-        })
-      ]);
+        timeoutPromise
+      ]).finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
 
       // Normalize and validate analysis result structure
+      const normalizeSkillNames = (arr: any): string[] => {
+        if (!Array.isArray(arr)) return [];
+        const stop = new Set(['cloud', 'backend', 'frontend', 'soft skills', 'soft_skills', 'communication']);
+        return Array.from(
+          new Set(
+            arr
+              .map((s) => (typeof s === 'string' ? s : s?.name))
+              .filter(Boolean)
+              .map((s) => String(s).trim().toLowerCase().replace(/\s+/g, '_'))
+              .filter((s) => !stop.has(s) || s.includes('aws') || s.includes('azure') || s.includes('gcp') || s.includes('kubernetes'))
+          )
+        ).map((s) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+      };
+
+      const normalizeMatchedSkills = (arr: any): Array<{ name: string; match: boolean }> => {
+        return normalizeSkillNames(arr).map((name) => ({ name, match: true }));
+      };
+
+      const normalizeTextList = (arr: any): string[] => {
+        if (!Array.isArray(arr)) return [];
+        const stop = ['cloud', 'backend', 'frontend', 'soft skills', 'soft_skills', 'communication'];
+        return Array.from(
+          new Set(
+            arr
+              .map((s) => (typeof s === 'string' ? s : s?.toString()))
+              .filter(Boolean)
+              .map((s) => s.trim())
+              .filter((s) => s.length > 2)
+              .filter((s) => !stop.includes(s.toLowerCase()) && !/:\s*(cloud|communication|soft skills)/i.test(s))
+          )
+        );
+      };
+
       const normalized = {
         score: typeof (analysis as any)?.score === 'number' && !Number.isNaN((analysis as any).score)
           ? (analysis as any).score
           : 0,
-        matchedSkills: Array.isArray((analysis as any)?.matchedSkills)
-          ? (analysis as any).matchedSkills
-          : [],
-        missingSkills: Array.isArray((analysis as any)?.missingSkills)
-          ? (analysis as any).missingSkills
-          : [],
+        matchedSkills: normalizeMatchedSkills((analysis as any)?.matchedSkills),
+        missingSkills: normalizeSkillNames((analysis as any)?.missingSkills),
         recommendations: {
-          improvements: (analysis as any)?.recommendations?.improvements ?? [],
-          strengths: (analysis as any)?.recommendations?.strengths ?? [],
-          skillGaps: (analysis as any)?.recommendations?.skillGaps ?? [],
-          format: (analysis as any)?.recommendations?.format ?? [],
+          improvements: normalizeTextList((analysis as any)?.recommendations?.improvements ?? []),
+          strengths: normalizeTextList((analysis as any)?.recommendations?.strengths ?? []),
+          skillGaps: normalizeTextList((analysis as any)?.recommendations?.skillGaps ?? []),
+          format: normalizeTextList((analysis as any)?.recommendations?.format ?? []),
         },
         detailedAnalysis: typeof (analysis as any)?.detailedAnalysis === 'string'
           ? (analysis as any).detailedAnalysis

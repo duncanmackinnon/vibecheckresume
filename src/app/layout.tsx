@@ -21,23 +21,6 @@ export default function RootLayout({
         <ErrorBoundary>
           {children}
         </ErrorBoundary>
-        
-        {/* Error handling for unhandled rejections */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              window.onerror = function(message, source, lineno, colno, error) {
-                console.error('Global error:', { message, source, lineno, colno, error });
-                // You could send this to your error tracking service
-              };
-              
-              window.onunhandledrejection = function(event) {
-                console.error('Unhandled promise rejection:', event.reason);
-                // You could send this to your error tracking service
-              };
-            `,
-          }}
-        />
       </body>
     </html>
   );

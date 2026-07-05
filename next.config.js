@@ -7,9 +7,6 @@ const nextConfig = {
       bodySizeLimit: '10mb'
     }
   },
-  env: {
-    DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
-  },
   async headers() {
     return [
       {

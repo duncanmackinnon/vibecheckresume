@@ -4,7 +4,8 @@ export async function logRequest(request: NextRequest) {
   console.log('API Request:', {
     method: request.method,
     url: request.url,
-    headers: Object.fromEntries(request.headers.entries()),
+    contentType: request.headers.get('content-type'),
+    contentLength: request.headers.get('content-length'),
   });
 
   // Log FormData if present
@@ -29,15 +30,7 @@ export async function logResponse(response: Response) {
   console.log('API Response:', {
     status: response.status,
     statusText: response.statusText,
-    headers: Object.fromEntries(response.headers.entries()),
+    contentType: response.headers.get('content-type'),
+    cacheControl: response.headers.get('cache-control'),
   });
-
-  // Clone the response before reading its body
-  const clone = response.clone();
-  try {
-    const body = await clone.json();
-    console.log('Response body:', body);
-  } catch (error) {
-    console.error('Error parsing response body:', error);
-  }
 }

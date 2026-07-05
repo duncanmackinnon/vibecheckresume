@@ -35,19 +35,19 @@ export class ErrorBoundary extends Component<Props, State> {
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 p-8">
-          <div className="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-lg">
+        <div className="clay-shell p-8">
+          <div className="clay-content clay-panel mx-auto max-w-2xl p-8">
             <h2 className="text-2xl font-bold text-red-600 mb-4">
               Something went wrong
             </h2>
-            <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+            <div className="clay-inset mb-4 border-l-4 border-red-500 p-4">
               <p className="text-red-700">
                 {this.state.error?.message || 'An unexpected error occurred'}
               </p>
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+              className="clay-button px-4 py-2 text-white"
             >
               Try again
             </button>

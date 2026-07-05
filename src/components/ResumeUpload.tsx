@@ -237,6 +237,9 @@ export default function ResumeUpload() {
               ...(analysis.recommendations?.format || [])
             ]}
             detailedAnalysis={analysis.detailedAnalysis}
+            evaluation={analysis.evaluation}
+            roleRequirements={analysis.roleRequirements}
+            priorityActions={analysis.priorityActions}
           />
         </>
       )}

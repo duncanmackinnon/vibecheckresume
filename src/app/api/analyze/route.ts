@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeWithAI } from '@/app/lib/deepseekEnhancer';
 import { extractPdfText } from '@/app/lib/pdfUtils';
+import { extractResumeBuilderProfileFromText, mergeResumeBuilderProfiles } from '@/app/lib/resumeBuilderProfile';
 import { logRequest, logResponse } from './middleware';
 import { env } from '@/utils/env';
 
@@ -10,6 +11,11 @@ export const maxDuration = 300; // hobby+fluid allows up to 300s; ignored otherw
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+const MAX_RESUME_BYTES = 8 * 1024 * 1024;
+const MAX_JOB_DESCRIPTION_BYTES = 256 * 1024;
+const MIN_USEFUL_TEXT_LENGTH = 25;
+const ACCEPTED_RESUME_TYPES = new Set(['application/pdf', 'text/plain']);
+
 function sanitizeError(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
@@ -18,14 +24,16 @@ function sanitizeError(error: unknown): string {
 
 function createResponse(data: unknown, status: number = 200): NextResponse {
   // Ensure the data is JSON-serializable
+  const headers = new Headers({
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+  });
+
   try {
     const sanitizedData = JSON.parse(JSON.stringify(data));
     const response = new NextResponse(JSON.stringify(sanitizedData), {
       status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-      },
+      headers,
     });
 
     // Log the response for debugging
@@ -33,7 +41,13 @@ function createResponse(data: unknown, status: number = 200): NextResponse {
     return response;
   } catch (error) {
     console.error('Error creating response:', error);
-    return createErrorResponse('Internal server error: Failed to serialize response');
+    return new NextResponse(
+      JSON.stringify({ error: 'Internal server error: Failed to serialize response' }),
+      {
+        status: 500,
+        headers,
+      }
+    );
   }
 }
 
@@ -44,6 +58,34 @@ function createErrorResponse(error: string, status: number = 500): NextResponse 
 function ensureFile(blob: Blob, name: string = 'file'): File {
   if (blob instanceof File) return blob;
   return new File([blob], name, { type: blob.type });
+}
+
+function getResumeContentType(file: File): string {
+  const explicitType = file.type?.toLowerCase();
+  if (ACCEPTED_RESUME_TYPES.has(explicitType)) return explicitType;
+
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.txt')) return 'text/plain';
+
+  return explicitType || 'unknown';
+}
+
+function validateResumeUpload(file: File, contentType: string): string | null {
+  if (file.size <= 0) return 'Resume file is empty';
+  if (file.size > MAX_RESUME_BYTES) return 'Resume file is too large. Upload a PDF or TXT file under 8 MB.';
+  if (!ACCEPTED_RESUME_TYPES.has(contentType)) return 'Unsupported resume file type. Upload a PDF or TXT file.';
+  return null;
+}
+
+function validateJobDescriptionUpload(file: File): string | null {
+  if (file.size <= 0) return 'Job description is empty';
+  if (file.size > MAX_JOB_DESCRIPTION_BYTES) return 'Job description is too large. Paste a shorter job description.';
+  return null;
+}
+
+function normalizeExtractedText(text: string): string {
+  return text.replace(/\0/g, '').replace(/\s+/g, ' ').trim();
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -90,11 +132,22 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Convert blobs to files
     const resumeFile = ensureFile(resume, 'resume');
     const jobDescriptionBlob = ensureFile(jobDescriptionFile, 'jobDescription');
+    const resumeContentType = getResumeContentType(resumeFile);
+
+    const resumeUploadError = validateResumeUpload(resumeFile, resumeContentType);
+    if (resumeUploadError) {
+      return createErrorResponse(resumeUploadError, 400);
+    }
+
+    const jobDescriptionUploadError = validateJobDescriptionUpload(jobDescriptionBlob);
+    if (jobDescriptionUploadError) {
+      return createErrorResponse(jobDescriptionUploadError, 400);
+    }
 
     console.log('Processing files:', {
       resume: {
         name: resumeFile.name,
-        type: resumeFile.type,
+        type: resumeContentType,
         size: resumeFile.size
       },
       jobDescription: {
@@ -106,33 +159,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Extract text content
     let resumeText: string;
+    let rawResumeText = '';
     let jobDescription: string;
 
     try {
       // Handle PDF files
-      if (resumeFile.type === 'application/pdf') {
+      if (resumeContentType === 'application/pdf') {
         console.log('Extracting text from PDF...');
-        resumeText = await extractPdfText(resumeFile);
+        rawResumeText = await extractPdfText(resumeFile);
       } else {
-        resumeText = await resumeFile.text();
+        rawResumeText = await resumeFile.text();
       }
 
       jobDescription = await jobDescriptionBlob.text();
+      resumeText = normalizeExtractedText(rawResumeText);
+      jobDescription = normalizeExtractedText(jobDescription);
 
       // Log extracted content lengths
       console.log('Content extracted:', {
         resumeLength: resumeText.length,
         jobDescriptionLength: jobDescription.length,
-        resumePreview: resumeText.substring(0, 100),
-        jobDescriptionPreview: jobDescription.substring(0, 100)
       });
 
       // Validate content
-      if (!resumeText?.trim() || resumeText.length < 10) {
-        return createErrorResponse('Resume text too short or empty', 400);
+      if (!resumeText || resumeText.length < MIN_USEFUL_TEXT_LENGTH) {
+        return createErrorResponse('Resume text is too short or could not be read. Upload a text-based PDF or TXT resume.', 400);
       }
-      if (!jobDescription?.trim() || jobDescription.length < 10) {
-        return createErrorResponse('Job description too short or empty', 400);
+      if (!jobDescription || jobDescription.length < MIN_USEFUL_TEXT_LENGTH) {
+        return createErrorResponse('Job description is too short. Paste the full job description before analyzing.', 400);
       }
 
     } catch (error) {
@@ -182,15 +236,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       const normalizeSkillNames = (arr: any): string[] => {
         if (!Array.isArray(arr)) return [];
         const stop = new Set(['cloud', 'backend', 'frontend', 'soft skills', 'soft_skills', 'communication']);
-        return Array.from(
-          new Set(
-            arr
-              .map((s) => (typeof s === 'string' ? s : s?.name))
-              .filter(Boolean)
-              .map((s) => String(s).trim().toLowerCase().replace(/\s+/g, '_'))
-              .filter((s) => !stop.has(s) || s.includes('aws') || s.includes('azure') || s.includes('gcp') || s.includes('kubernetes'))
-          )
-        ).map((s) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+        const seen = new Set<string>();
+        return arr
+          .map((s) => (typeof s === 'string' ? s : s?.name))
+          .filter(Boolean)
+          .map((s) => String(s).replace(/\s+/g, ' ').trim())
+          .filter((s) => {
+            const key = s.toLowerCase().replace(/\s+/g, '_');
+            if (stop.has(key) && !/(aws|azure|gcp|kubernetes)/i.test(s)) return false;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
       };
 
       const normalizeMatchedSkills = (arr: any): Array<{ name: string; match: boolean }> => {
@@ -212,10 +269,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
       };
 
+      const rawScore = typeof (analysis as any)?.score === 'number' && !Number.isNaN((analysis as any).score)
+        ? (analysis as any).score
+        : 0;
+      const evaluation = (analysis as any)?.evaluation;
+      const resumeSections = (analysis as any)?.resumeSections;
+      const resumeBuilderProfile = mergeResumeBuilderProfiles(
+        (analysis as any)?.resumeBuilderProfile,
+        extractResumeBuilderProfileFromText(rawResumeText)
+      );
+      const roleRequirements = (analysis as any)?.roleRequirements;
+      const priorityActions = (analysis as any)?.priorityActions;
+
       const normalized = {
-        score: typeof (analysis as any)?.score === 'number' && !Number.isNaN((analysis as any).score)
-          ? (analysis as any).score
-          : 0,
+        score: Math.max(0, Math.min(100, Math.round(rawScore))),
         matchedSkills: normalizeMatchedSkills((analysis as any)?.matchedSkills),
         missingSkills: normalizeSkillNames((analysis as any)?.missingSkills),
         recommendations: {
@@ -227,6 +294,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         detailedAnalysis: typeof (analysis as any)?.detailedAnalysis === 'string'
           ? (analysis as any).detailedAnalysis
           : ((analysis as any)?.summary as string) ?? '',
+        ...(evaluation && typeof evaluation === 'object' ? { evaluation } : {}),
+        ...(resumeSections && typeof resumeSections === 'object' ? { resumeSections } : {}),
+        ...(resumeBuilderProfile ? { resumeBuilderProfile } : {}),
+        ...(Array.isArray(roleRequirements) ? { roleRequirements } : {}),
+        ...(Array.isArray(priorityActions) ? { priorityActions } : {}),
       };
 
       // Serialize response

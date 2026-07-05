@@ -54,6 +54,80 @@ export const createMockAnalysis = (partial?: Partial<Analysis>): Analysis => ({
     format: ['Well-structured resume', 'Clear presentation']
   },
   detailedAnalysis: 'Detailed analysis of the resume...',
+  resumeSections: {
+    basics: ['Software engineer with frontend delivery experience.'],
+    work: ['Delivered React and TypeScript applications.'],
+    education: ['Computer science background listed when relevant to role requirements.'],
+    skills: ['JavaScript', 'React', 'TypeScript'],
+    projects: ['Relevant project evidence demonstrates application delivery.'],
+    awardsCertifications: []
+  },
+  roleRequirements: [
+    {
+      text: 'React frontend delivery',
+      status: 'matched',
+      evidence: 'The resume shows React and TypeScript application work.'
+    },
+    {
+      text: 'AWS experience',
+      status: 'missing',
+      evidence: 'The resume does not show clear AWS project evidence.'
+    }
+  ],
+  priorityActions: [
+    {
+      categoryId: 'technical_skills',
+      title: 'Add AWS delivery evidence',
+      rationale: 'The job values AWS and the resume does not show a concrete AWS project.',
+      impact: 'high',
+      effort: 'medium',
+      exampleRewrite: 'Add a bullet describing an AWS deployment, service used, and measurable result.'
+    }
+  ],
+  evaluation: {
+    categories: [
+      {
+        id: 'technical_skills',
+        label: 'Technical Skills',
+        score: 30,
+        max: 35,
+        evidence: 'The resume shows JavaScript, React, and TypeScript experience.'
+      },
+      {
+        id: 'experience_relevance',
+        label: 'Experience Relevance',
+        score: 25,
+        max: 30,
+        evidence: 'The resume includes senior frontend engineering experience.'
+      },
+      {
+        id: 'projects_and_open_source',
+        label: 'Projects and Open Source',
+        score: 15,
+        max: 20,
+        evidence: 'The resume includes relevant implementation and delivery examples.'
+      },
+      {
+        id: 'role_alignment',
+        label: 'Role Alignment',
+        score: 15,
+        max: 15,
+        evidence: 'The candidate aligns with frontend role responsibilities.'
+      }
+    ],
+    bonus: {
+      score: 0,
+      max: 10,
+      evidence: 'No bonus points applied.'
+    },
+    deductions: {
+      score: 0,
+      evidence: 'No deductions applied.'
+    },
+    fairnessNotes: [
+      'Scoring excludes demographic, location, school-name, and grade-based signals.'
+    ]
+  },
   ...partial
 });
 

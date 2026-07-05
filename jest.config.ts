@@ -24,6 +24,7 @@ const customJestConfig: Config = {
     '^@/components/(.*)$': '<rootDir>/src/components/$1',
     '^@/app/(.*)$': '<rootDir>/src/app/$1',
     '^@/lib/(.*)$': '<rootDir>/src/lib/$1',
+    '^@/utils/(.*)$': '<rootDir>/src/utils/$1',
     '^@/app/lib/validateEnv$': '<rootDir>/src/app/lib/validateEnv.cjs',
     '^@/types/(.*)$': '<rootDir>/src/types/$1',
     '^@/test/(.*)$': '<rootDir>/src/test/$1',

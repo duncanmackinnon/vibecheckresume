@@ -67,5 +67,109 @@
       "Consider adding more quantifiable achievements"
     ]
   },
-  "detailedAnalysis": "The candidate shows strong alignment with the core requirements of the position, particularly in full-stack development with JavaScript/TypeScript, React, and Node.js. Their 5+ years of experience matches the requirement exactly. The resume demonstrates experience in key areas such as API development, testing, and AWS cloud platform usage.\n\nStrong points include their experience mentoring junior developers, implementing CI/CD pipelines, and optimizing application performance - all of which are specifically mentioned in the job requirements. Their background in testing and debugging also aligns well with the position's needs.\n\nHowever, there are some gaps in the nice-to-have skills. While the candidate has AWS certification, they lack experience with Docker and Kubernetes, which could be valuable for this role. Python experience is also mentioned as desirable but isn't reflected in their skill set. The addition of GraphQL knowledge would further strengthen their candidacy.\n\nOverall, the candidate appears to be a strong match for the position, meeting most of the critical requirements and demonstrating relevant experience in a similar role. The missing skills are primarily in the nice-to-have category and could be learned on the job."
+  "detailedAnalysis": "The candidate shows strong alignment with the core requirements of the position, particularly in full-stack development with JavaScript/TypeScript, React, and Node.js. Their 5+ years of experience matches the requirement exactly. The resume demonstrates experience in key areas such as API development, testing, and AWS cloud platform usage.\n\nStrong points include their experience mentoring junior developers, implementing CI/CD pipelines, and optimizing application performance - all of which are specifically mentioned in the job requirements. Their background in testing and debugging also aligns well with the position's needs.\n\nHowever, there are some gaps in the nice-to-have skills. While the candidate has AWS certification, they lack experience with Docker and Kubernetes, which could be valuable for this role. Python experience is also mentioned as desirable but isn't reflected in their skill set. The addition of GraphQL knowledge would further strengthen their candidacy.\n\nOverall, the candidate appears to be a strong match for the position, meeting most of the critical requirements and demonstrating relevant experience in a similar role. The missing skills are primarily in the nice-to-have category and could be learned on the job.",
+  "resumeSections": {
+    "basics": [
+      "Full-stack engineer with JavaScript, TypeScript, React, and Node.js experience."
+    ],
+    "work": [
+      "Mentored junior developers, implemented CI/CD pipelines, and optimized application performance."
+    ],
+    "education": [
+      "Education is listed when relevant to explicit role requirements."
+    ],
+    "skills": [
+      "JavaScript",
+      "TypeScript",
+      "React",
+      "Node.js",
+      "AWS",
+      "Testing"
+    ],
+    "projects": [
+      "Implementation experience is present, but public project or repository evidence is limited."
+    ],
+    "awardsCertifications": [
+      "AWS certification supports the cloud requirement."
+    ]
+  },
+  "roleRequirements": [
+    {
+      "text": "JavaScript, TypeScript, React, and Node.js delivery",
+      "status": "matched",
+      "evidence": "The resume includes direct experience with JavaScript, TypeScript, React, and Node.js."
+    },
+    {
+      "text": "Docker and Kubernetes experience",
+      "status": "missing",
+      "evidence": "The resume does not show Docker or Kubernetes experience."
+    },
+    {
+      "text": "Python experience",
+      "status": "missing",
+      "evidence": "Python is desirable in the role but not shown in the resume."
+    }
+  ],
+  "priorityActions": [
+    {
+      "categoryId": "technical_skills",
+      "title": "Add containerization evidence",
+      "rationale": "Docker and Kubernetes are listed as gaps, so adding project evidence would improve technical alignment.",
+      "impact": "high",
+      "effort": "medium",
+      "exampleRewrite": "Add a bullet describing a Docker or Kubernetes deployment, the service involved, and the operational result."
+    },
+    {
+      "categoryId": "projects_and_open_source",
+      "title": "Show project-level proof",
+      "rationale": "The scorecard notes limited explicit project or repository evidence.",
+      "impact": "medium",
+      "effort": "low",
+      "exampleRewrite": "Add a project entry with stack, role, outcome, and link if available."
+    }
+  ],
+  "evaluation": {
+    "categories": [
+      {
+        "id": "technical_skills",
+        "label": "Technical Skills",
+        "score": 31,
+        "max": 35,
+        "evidence": "The resume includes JavaScript, TypeScript, React, Node.js, Express, Git, AWS, and testing experience."
+      },
+      {
+        "id": "experience_relevance",
+        "label": "Experience Relevance",
+        "score": 26,
+        "max": 30,
+        "evidence": "The candidate's full-stack development, API development, mentoring, CI/CD, and optimization work matches the role responsibilities."
+      },
+      {
+        "id": "projects_and_open_source",
+        "label": "Projects and Open Source",
+        "score": 14,
+        "max": 20,
+        "evidence": "The resume demonstrates implementation experience but has limited explicit project, repository, or open-source contribution evidence."
+      },
+      {
+        "id": "role_alignment",
+        "label": "Role Alignment",
+        "score": 14,
+        "max": 15,
+        "evidence": "The resume aligns strongly with the senior software engineering role while leaving some preferred technologies uncovered."
+      }
+    ],
+    "bonus": {
+      "score": 0,
+      "max": 10,
+      "evidence": "No bonus points applied."
+    },
+    "deductions": {
+      "score": 0,
+      "evidence": "No deductions applied."
+    },
+    "fairnessNotes": [
+      "Scoring excludes demographic, location, school-name, and grade-based signals."
+    ]
+  }
 }

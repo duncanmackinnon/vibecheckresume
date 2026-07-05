@@ -26,12 +26,7 @@ export async function extractPdfText(file: File): Promise<string> {
     return data.text.trim();
   } catch (error) {
     console.error('Error extracting PDF text:', error);
-    
-    // Fallback to basic text extraction if PDF parsing fails
-    try {
-      return await file.text();
-    } catch (fallbackError) {
-      throw new Error('Failed to extract text from file');
-    }
+    const message = error instanceof Error ? error.message : 'Unknown PDF parsing error';
+    throw new Error(`Failed to extract text from PDF: ${message}`);
   }
 }

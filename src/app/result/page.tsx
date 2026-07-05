@@ -27,19 +27,20 @@ export default function ResultPage() {
   const handleNewAnalysis = () => {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('latestAnalysis');
+      sessionStorage.removeItem('latestJobDescription');
     }
     router.push('/');
   };
 
   if (!analysis) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 flex items-center justify-center px-6">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center space-y-4">
+      <div className="clay-shell flex items-center justify-center px-6">
+        <div className="clay-content clay-panel max-w-md space-y-4 p-8 text-center">
           <p className="text-lg font-semibold text-gray-800">No analysis to show yet.</p>
           <p className="text-sm text-gray-600">Upload a resume and job description first.</p>
           <Link
             href="/"
-            className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm"
+            className="clay-button inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-white"
           >
             Go to Analyzer
           </Link>
@@ -49,16 +50,17 @@ export default function ResultPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50 p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
+    <div className="clay-shell px-4 py-6 sm:px-8">
+      <div className="clay-content mx-auto max-w-6xl space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-slate-900">Analysis Report</h1>
-            <p className="text-sm text-slate-600">AI-enhanced resume/job description match</p>
+            <p className="clay-kicker text-xs font-bold uppercase">Resume Fit Studio</p>
+            <h1 className="mt-2 text-3xl font-black text-slate-950">Analysis Report</h1>
+            <p className="text-sm text-slate-600">AI-enhanced resume and job-description match</p>
           </div>
           <button
             onClick={handleNewAnalysis}
-            className="inline-flex items-center justify-center px-3 py-2 rounded-lg text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 shadow-sm"
+            className="clay-secondary-button inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-slate-800"
           >
             New Analysis
           </button>
@@ -74,8 +76,29 @@ export default function ResultPage() {
             ...(analysis.recommendations?.format || [])
           ]}
           detailedAnalysis={analysis.detailedAnalysis}
+          evaluation={analysis.evaluation}
+          roleRequirements={analysis.roleRequirements}
+          priorityActions={analysis.priorityActions}
           onNewAnalysis={handleNewAnalysis}
         />
+
+        <section className="clay-panel p-5 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="clay-kicker text-xs font-bold uppercase">Next Step</p>
+              <h2 className="mt-2 text-xl font-black text-slate-950">Build a tailored resume</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Use the extracted resume profile, this report, and targeted follow-up questions to generate a LaTeX resume.
+              </p>
+            </div>
+            <Link
+              href="/resume-builder"
+              className="clay-button inline-flex items-center justify-center px-4 py-3 text-sm font-bold text-white"
+            >
+              Open Resume Builder
+            </Link>
+          </div>
+        </section>
       </div>
     </div>
   );

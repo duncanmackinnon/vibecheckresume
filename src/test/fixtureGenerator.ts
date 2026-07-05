@@ -1,4 +1,4 @@
-import { Analysis } from '@/app/types';
+import type { Analysis, AnalysisEvaluation, PriorityAction, ResumeSections, RoleRequirement } from '@/app/types';
 import { createTempFixture } from './fixtureLoader';
 
 /**
@@ -57,6 +57,87 @@ const SKILLS = [
   'Git',
   'Agile',
 ];
+
+const EVALUATION_CATEGORIES = [
+  { id: 'technical_skills', label: 'Technical Skills', max: 35 },
+  { id: 'experience_relevance', label: 'Experience Relevance', max: 30 },
+  { id: 'projects_and_open_source', label: 'Projects and Open Source', max: 20 },
+  { id: 'role_alignment', label: 'Role Alignment', max: 15 },
+];
+
+function generateEvaluation(score: number): AnalysisEvaluation {
+  let runningTotal = 0;
+  const categories = EVALUATION_CATEGORIES.map((category, index) => {
+    const isLast = index === EVALUATION_CATEGORIES.length - 1;
+    const categoryScore = isLast
+      ? Math.max(0, Math.min(category.max, score - runningTotal))
+      : Math.max(0, Math.min(category.max, Math.round(score * (category.max / 100))));
+    runningTotal += categoryScore;
+
+    return {
+      ...category,
+      score: categoryScore,
+      evidence: `${category.label} evidence is based on job-relevant resume details.`,
+    };
+  });
+
+  return {
+    categories,
+    bonus: {
+      score: 0,
+      max: 10,
+      evidence: 'No bonus points applied.',
+    },
+    deductions: {
+      score: 0,
+      evidence: 'No deductions applied.',
+    },
+    fairnessNotes: [
+      'Scoring excludes demographic, location, school-name, and grade-based signals.',
+    ],
+  };
+}
+
+function generateResumeSections(matchedSkills: Array<{ name: string; match: boolean }>): ResumeSections {
+  const skillNames = matchedSkills.map((skill) => skill.name);
+
+  return {
+    basics: ['Software engineer with job-relevant product delivery experience.'],
+    work: ['Built and maintained applications using relevant frontend and backend technologies.'],
+    education: ['Education details are present when job-relevant credentials are required.'],
+    skills: skillNames,
+    projects: ['Project evidence demonstrates implementation and delivery experience.'],
+    awardsCertifications: ['No role-specific awards or certifications were required.'],
+  };
+}
+
+function generateRoleRequirements(matchedSkills: Array<{ name: string; match: boolean }>, missingSkills: string[]): RoleRequirement[] {
+  return [
+    {
+      text: `Experience with ${matchedSkills[0]?.name ?? 'relevant technologies'}`,
+      status: 'matched',
+      evidence: `The resume includes ${matchedSkills[0]?.name ?? 'relevant'} experience.`,
+    },
+    {
+      text: `Experience with ${missingSkills[0] ?? 'additional required skills'}`,
+      status: 'missing',
+      evidence: `The resume does not show clear ${missingSkills[0] ?? 'additional required skill'} evidence.`,
+    },
+  ];
+}
+
+function generatePriorityActions(missingSkills: string[]): PriorityAction[] {
+  return [
+    {
+      categoryId: 'technical_skills',
+      title: `Add ${missingSkills[0] ?? 'missing skill'} evidence`,
+      rationale: `The target role asks for ${missingSkills[0] ?? 'a skill'} and the resume does not yet show it clearly.`,
+      impact: 'high',
+      effort: 'medium',
+      exampleRewrite: `Add a resume bullet showing how ${missingSkills[0] ?? 'the missing skill'} was used to deliver a measurable result.`,
+    },
+  ];
+}
 
 /**
  * Generate a random resume
@@ -171,7 +252,11 @@ export function generateAnalysis(options: AnalysisOptions = {}): Analysis {
 The candidate shows ${score}% match with the job requirements.
 Strong experience in ${matchedSkills.map(s => s.name).join(', ')}.
 Areas for improvement: ${missingSkills.join(', ')}.
-`.trim()
+`.trim(),
+    evaluation: generateEvaluation(score),
+    resumeSections: generateResumeSections(matchedSkills),
+    roleRequirements: generateRoleRequirements(matchedSkills, missingSkills),
+    priorityActions: generatePriorityActions(missingSkills)
   };
 }
 

@@ -138,3 +138,34 @@
     letter-spacing: 0.18em;
   }
 }
+
+@media print {
+  html,
+  body {
+    background: #ffffff !important;
+  }
+
+  .clay-shell {
+    min-height: auto;
+    overflow: visible;
+    background: #ffffff !important;
+  }
+
+  .clay-shell::before,
+  .resume-preview-chrome {
+    display: none !important;
+  }
+
+  .clay-content {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  .resume-preview-paper {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    padding: 0.35in 0.5in !important;
+  }
+}

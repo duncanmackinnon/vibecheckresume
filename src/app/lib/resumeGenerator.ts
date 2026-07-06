@@ -1,6 +1,10 @@
 import type {
   Analysis,
   GeneratedResume,
+  GeneratedResumePreview,
+  GeneratedResumePreviewItem,
+  GeneratedResumePreviewSection,
+  GeneratedResumePreviewSkillGroup,
   ResumeGenerationAnswers,
 } from '../types';
 import { getResumeGenerationQuestions } from './resumeGeneratorQuestions';
@@ -76,6 +80,163 @@ function toStringList(value: unknown, maxItems = 8): string[] {
       return true;
     })
     .slice(0, maxItems);
+}
+
+function toPreviewText(value: unknown, maxLength = 260): string {
+  if (typeof value !== 'string') return '';
+
+  return value
+    .replace(/\0/g, '')
+    .replace(/\$\\mid\$/g, '|')
+    .replace(/\\(?:textbf|textit|emph|small|scshape)\{([^{}]*)\}/g, '$1')
+    .replace(/\\href\{[^{}]*\}\{([^{}]*)\}/g, '$1')
+    .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\\\\/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function toPreviewList(value: unknown, maxItems = 8, maxLength = 260): string[] {
+  if (!Array.isArray(value)) return [];
+
+  const seen = new Set<string>();
+  return value
+    .map((item) => toPreviewText(item, maxLength))
+    .filter(Boolean)
+    .filter((item) => {
+      const key = item.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, maxItems);
+}
+
+function normalizePreviewItem(value: unknown): GeneratedResumePreviewItem | null {
+  if (typeof value === 'string') {
+    const heading = toPreviewText(value, 160);
+    return heading ? { heading, details: [] } : null;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const heading =
+    toPreviewText(readProperty(value, 'heading'), 180) ||
+    toPreviewText(readProperty(value, 'title'), 180) ||
+    toPreviewText(readProperty(value, 'name'), 180);
+  const details = toPreviewList(
+    readProperty(value, 'details') ?? readProperty(value, 'bullets') ?? readProperty(value, 'highlights'),
+    6,
+    320
+  );
+
+  if (!heading && details.length === 0) return null;
+
+  return {
+    heading: heading || details[0],
+    subheading: toPreviewText(readProperty(value, 'subheading') ?? readProperty(value, 'organization'), 180) || undefined,
+    meta: toPreviewText(readProperty(value, 'meta') ?? readProperty(value, 'technologies') ?? readProperty(value, 'location'), 180) || undefined,
+    date: toPreviewText(readProperty(value, 'date') ?? readProperty(value, 'dates'), 120) || undefined,
+    details: heading ? details : details.slice(1),
+  };
+}
+
+function normalizePreviewSection(value: unknown): GeneratedResumePreviewSection | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const title = toPreviewText(readProperty(value, 'title'), 80);
+  const rawItems = readProperty(value, 'items');
+  const items = Array.isArray(rawItems)
+    ? rawItems.map(normalizePreviewItem).filter((item): item is GeneratedResumePreviewItem => Boolean(item)).slice(0, 8)
+    : [];
+
+  if (!title || items.length === 0) return null;
+
+  return { title, items };
+}
+
+function normalizePreviewSkillGroup(value: unknown): GeneratedResumePreviewSkillGroup | null {
+  if (typeof value === 'string') {
+    const skills = toPreviewList([value], 1, 80);
+    return skills.length ? { label: 'Skills', skills } : null;
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const label = toPreviewText(readProperty(value, 'label') ?? readProperty(value, 'title'), 80);
+  const skills = toPreviewList(readProperty(value, 'skills') ?? readProperty(value, 'items'), 14, 80);
+
+  if (!label || skills.length === 0) return null;
+
+  return { label, skills };
+}
+
+function createFallbackPreview(latex: string): GeneratedResumePreview {
+  const body = latex.match(/\\begin\{document\}([\s\S]*?)\\end\{document\}/)?.[1] ?? latex;
+  const lines = body
+    .replace(/\\section\{([^{}]+)\}/g, '\n$1\n')
+    .replace(/\\resumeItem\{([^{}]+)\}/g, '\n$1\n')
+    .split(/\r?\n/)
+    .map((line) => toPreviewText(line, 260))
+    .filter((line) => line && !/^(begin|end|resumeSubHeadingList|resumeItemList)/i.test(line));
+
+  const fullName = lines.find((line) => !/^(Experience|Projects|Education|Technical Skills)$/i.test(line)) ?? 'Generated Resume';
+  const detailLines = lines.filter((line) => line !== fullName).slice(0, 10);
+
+  return {
+    fullName,
+    contact: [],
+    sections: detailLines.length
+      ? [
+          {
+            title: 'Resume Preview',
+            items: [{ heading: 'Generated resume content', details: detailLines }],
+          },
+        ]
+      : [],
+    skillGroups: [],
+  };
+}
+
+function normalizeGeneratedResumePreview(value: unknown, latex: string): GeneratedResumePreview {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return createFallbackPreview(latex);
+  }
+
+  const sectionsValue = readProperty(value, 'sections');
+  const skillGroupsValue = readProperty(value, 'skillGroups') ?? readProperty(value, 'skills');
+  const fullName = toPreviewText(readProperty(value, 'fullName') ?? readProperty(value, 'name'), 120);
+  const preview: GeneratedResumePreview = {
+    fullName: fullName || createFallbackPreview(latex).fullName,
+    contact: toPreviewList(readProperty(value, 'contact') ?? readProperty(value, 'contactDetails'), 8, 120),
+    headline: toPreviewText(readProperty(value, 'headline') ?? readProperty(value, 'targetTitle'), 160) || undefined,
+    summary: toPreviewText(readProperty(value, 'summary'), 420) || undefined,
+    sections: Array.isArray(sectionsValue)
+      ? sectionsValue
+          .map(normalizePreviewSection)
+          .filter((section): section is GeneratedResumePreviewSection => Boolean(section))
+          .slice(0, 6)
+      : [],
+    skillGroups: Array.isArray(skillGroupsValue)
+      ? skillGroupsValue
+          .map(normalizePreviewSkillGroup)
+          .filter((group): group is GeneratedResumePreviewSkillGroup => Boolean(group))
+          .slice(0, 6)
+      : [],
+  };
+
+  if (preview.sections.length === 0 && preview.skillGroups.length === 0) {
+    const fallback = createFallbackPreview(latex);
+    return {
+      ...preview,
+      sections: fallback.sections,
+      skillGroups: fallback.skillGroups,
+    };
+  }
+
+  return preview;
 }
 
 function parseJsonContent(content: string): unknown {
@@ -291,6 +452,7 @@ export function normalizeGeneratedResume(payload: unknown): GeneratedResume {
 
   return {
     latex,
+    preview: normalizeGeneratedResumePreview(readProperty(payload, 'preview'), latex),
     tailoringNotes: toStringList(readProperty(payload, 'tailoringNotes'), 10),
     assumptions: toStringList(readProperty(payload, 'assumptions'), 8),
     followUpQuestions: toStringList(readProperty(payload, 'followUpQuestions'), 6),
@@ -331,10 +493,38 @@ Rules:
 - Education can include credential, degree, field, certification, coursework, or issuer when supported by evidence or user answers.
 - GitHub, portfolio, and open-source evidence must come only from the provided analysis or user answers. Do not fetch external data.
 - Do not include unsafe LaTeX commands such as write18, shellesc, arbitrary input/include, read, openout, or file operations.
+- Also return a "preview" object that mirrors the LaTeX resume in clean plain text for the app preview page.
+- The preview must not contain LaTeX commands, markdown, placeholders, or unsupported facts.
 
 JSON schema:
 {
   "latex": string,
+  "preview": {
+    "fullName": string,
+    "contact": string[],
+    "headline": string,
+    "summary": string,
+    "sections": [
+      {
+        "title": string,
+        "items": [
+          {
+            "heading": string,
+            "subheading": string,
+            "meta": string,
+            "date": string,
+            "details": string[]
+          }
+        ]
+      }
+    ],
+    "skillGroups": [
+      {
+        "label": string,
+        "skills": string[]
+      }
+    ]
+  },
   "tailoringNotes": string[],
   "assumptions": string[],
   "followUpQuestions": string[]
@@ -367,6 +557,32 @@ ${parseError instanceof Error ? parseError.message : String(parseError)}
 Return valid JSON only using this schema:
 {
   "latex": string,
+  "preview": {
+    "fullName": string,
+    "contact": string[],
+    "headline": string,
+    "summary": string,
+    "sections": [
+      {
+        "title": string,
+        "items": [
+          {
+            "heading": string,
+            "subheading": string,
+            "meta": string,
+            "date": string,
+            "details": string[]
+          }
+        ]
+      }
+    ],
+    "skillGroups": [
+      {
+        "label": string,
+        "skills": string[]
+      }
+    ]
+  },
   "tailoringNotes": string[],
   "assumptions": string[],
   "followUpQuestions": string[]
@@ -374,6 +590,7 @@ Return valid JSON only using this schema:
 
 Rules:
 - Preserve the generated LaTeX resume content.
+- Preserve or reconstruct the preview fields from the same resume content.
 - Escape all JSON string backslashes and newlines correctly.
 - Do not include markdown fences.
 - Do not add text outside the JSON object.

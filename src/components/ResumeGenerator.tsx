@@ -1,7 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { Analysis, GeneratedResume, ResumeGenerationAnswers } from '@/app/types';
+import { useRouter } from 'next/navigation';
+import type { Analysis, ResumeGenerationAnswers } from '@/app/types';
 import {
   createInitialResumeGenerationAnswers,
   getResumeGenerationQuestions,
@@ -13,19 +14,13 @@ interface ResumeGeneratorProps {
   jobDescription?: string;
 }
 
-function sanitizeFilename(value: string): string {
-  const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-  return normalized || 'tailored-resume';
-}
-
 export default function ResumeGenerator({ analysis, jobDescription = '' }: ResumeGeneratorProps) {
   const [answers, setAnswers] = useState<ResumeGenerationAnswers>(() =>
     createInitialResumeGenerationAnswers(analysis, jobDescription)
   );
-  const [generatedResume, setGeneratedResume] = useState<GeneratedResume | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
+  const router = useRouter();
 
   const targetedQuestions = useMemo(
     () => getResumeGenerationQuestions(analysis, jobDescription)
@@ -44,7 +39,6 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
   const updateAnswer = (id: string, value: string) => {
     setAnswers((current) => ({ ...current, [id]: value }));
     setError('');
-    setCopied(false);
   };
 
   const handleGenerate = async (event: React.FormEvent) => {
@@ -53,7 +47,6 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
 
     setIsGenerating(true);
     setError('');
-    setCopied(false);
 
     try {
       const response = await fetch('/api/generate-resume', {
@@ -76,37 +69,21 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
         throw new Error(typeof errorValue === 'string' ? errorValue : 'Failed to generate resume');
       }
 
-      if (!data || typeof data.latex !== 'string') {
+      if (!data || typeof data.latex !== 'string' || !data.preview || typeof data.preview.fullName !== 'string') {
         throw new Error('Invalid resume generation response');
       }
 
-      setGeneratedResume(data);
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('latestGeneratedResume', JSON.stringify(data));
+        sessionStorage.setItem('latestResumeGenerationAnswers', JSON.stringify(answers));
+      }
+
+      router.push('/resume-preview');
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : 'Failed to generate resume');
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const handleCopy = async () => {
-    if (!generatedResume?.latex) return;
-
-    await navigator.clipboard.writeText(generatedResume.latex);
-    setCopied(true);
-  };
-
-  const handleDownload = () => {
-    if (!generatedResume?.latex || typeof document === 'undefined') return;
-
-    const blob = new Blob([generatedResume.latex], { type: 'text/x-tex;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${sanitizeFilename(answers.fullName)}-resume.tex`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
   };
 
   return (
@@ -115,10 +92,10 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
         <div>
           <p className="clay-kicker text-xs font-bold uppercase">Resume Builder</p>
           <h2 id="resume-generator-heading" className="mt-2 text-2xl font-black text-slate-950">
-            Generate Tailored LaTeX Resume
+            Generate Tailored Resume
           </h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            Starts from the extracted resume profile and asks only for role-relevant missing evidence.
+            Starts from the extracted resume profile, asks only for role-relevant missing evidence, then opens a formatted preview.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs font-semibold">
@@ -254,7 +231,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
             disabled={!requiredAnswered || isGenerating}
             className="clay-button inline-flex w-full items-center justify-center px-4 py-3 text-sm font-bold text-white"
           >
-            {isGenerating ? 'Generating...' : 'Generate LaTeX Resume'}
+            {isGenerating ? 'Generating...' : 'Generate Resume Preview'}
           </button>
         </form>
 
@@ -292,57 +269,12 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
             </div>
           )}
 
-          {generatedResume && (
-            <div className="clay-panel-muted p-4" aria-live="polite">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">Generated Output</h3>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    className="clay-secondary-button px-3 py-2 text-xs font-bold text-slate-800"
-                  >
-                    {copied ? 'Copied' : 'Copy LaTeX'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="clay-secondary-button px-3 py-2 text-xs font-bold text-slate-800"
-                  >
-                    Download .tex
-                  </button>
-                </div>
-              </div>
-
-              {generatedResume.tailoringNotes.length > 0 && (
-                <ul className="mt-3 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-600">
-                  {generatedResume.tailoringNotes.map((note, index) => (
-                    <li key={`${note}-${index}`}>{note}</li>
-                  ))}
-                </ul>
-              )}
-
-              <textarea
-                className="clay-inset mt-3 h-72 w-full resize-y p-3 font-mono text-xs leading-5 text-slate-800"
-                value={generatedResume.latex}
-                readOnly
-                aria-label="Generated LaTeX resume"
-              />
-
-              {generatedResume.followUpQuestions.length > 0 && (
-                <div className="mt-3 border-t border-white/70 pt-3">
-                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Follow-up questions
-                  </h4>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-xs leading-5 text-slate-600">
-                    {generatedResume.followUpQuestions.map((question, index) => (
-                      <li key={`${question}-${index}`}>{question}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="clay-panel-muted p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Next Step</h3>
+            <p className="mt-2 text-xs leading-5 text-slate-600">
+              After generation, the resume opens on a dedicated preview page with export actions and the underlying LaTeX available for review.
+            </p>
+          </div>
         </aside>
       </div>
     </section>

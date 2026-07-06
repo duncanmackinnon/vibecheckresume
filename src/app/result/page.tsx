@@ -28,6 +28,8 @@ export default function ResultPage() {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('latestAnalysis');
       sessionStorage.removeItem('latestJobDescription');
+      sessionStorage.removeItem('latestGeneratedResume');
+      sessionStorage.removeItem('latestResumeGenerationAnswers');
     }
     router.push('/');
   };
@@ -88,7 +90,7 @@ export default function ResultPage() {
               <p className="clay-kicker text-xs font-bold uppercase">Next Step</p>
               <h2 className="mt-2 text-xl font-black text-slate-950">Build a tailored resume</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Use the extracted resume profile, this report, and targeted follow-up questions to generate a LaTeX resume.
+                Use the extracted resume profile, this report, and targeted follow-up questions to generate a preview with LaTeX export.
               </p>
             </div>
             <Link

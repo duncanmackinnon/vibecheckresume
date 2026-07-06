@@ -32,6 +32,8 @@ export default function ResumeBuilderPage() {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('latestAnalysis');
       sessionStorage.removeItem('latestJobDescription');
+      sessionStorage.removeItem('latestGeneratedResume');
+      sessionStorage.removeItem('latestResumeGenerationAnswers');
     }
     router.push('/');
   };
@@ -60,7 +62,7 @@ export default function ResumeBuilderPage() {
           <div>
             <p className="clay-kicker text-xs font-bold uppercase">Resume Fit Studio</p>
             <h1 className="mt-2 text-3xl font-black text-slate-950">Resume Builder</h1>
-            <p className="text-sm text-slate-600">Generate a role-tailored LaTeX resume from the report evidence.</p>
+            <p className="text-sm text-slate-600">Generate a role-tailored resume preview from the report evidence.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
             <Link

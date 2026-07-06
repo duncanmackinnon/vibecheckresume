@@ -93,6 +93,28 @@ describe('/api/generate-resume', () => {
 \begin{document}
 Jane Doe
 \end{document}`,
+      preview: {
+        fullName: 'Jane Doe',
+        contact: ['jane@example.com', 'linkedin.com/in/jane'],
+        headline: 'Frontend Engineer',
+        summary: 'Frontend engineer focused on React delivery.',
+        sections: [
+          {
+            title: 'Experience',
+            items: [
+              {
+                heading: 'Frontend Engineer',
+                subheading: 'Acme',
+                date: '2022 - Present',
+                details: ['Reduced load time by 30 percent.'],
+              },
+            ],
+          },
+        ],
+        skillGroups: [
+          { label: 'Languages', skills: ['TypeScript', 'JavaScript'] },
+        ],
+      },
       tailoringNotes: ['Tailored to React role requirements.'],
       assumptions: [],
       followUpQuestions: [],
@@ -121,6 +143,8 @@ Jane Doe
       answers: expect.objectContaining(answers),
     });
     expect(data.latex).toContain(String.raw`\documentclass{article}`);
+    expect(data.preview.fullName).toBe('Jane Doe');
+    expect(data.preview.sections[0].title).toBe('Experience');
     expect(data.tailoringNotes).toEqual(['Tailored to React role requirements.']);
   });
 

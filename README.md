@@ -10,7 +10,7 @@ AI-powered resume analyzer that compares a PDF or TXT resume against a pasted jo
 - Matched and missing skill extraction
 - Role requirement checklist
 - Prioritized resume fixes for job seekers
-- DeepSeek-powered LaTeX resume generator using the analysis evidence and user follow-up answers
+- DeepSeek-powered resume builder that uses analysis evidence, targeted follow-up answers, a rendered preview, and LaTeX export
 - Fairness guardrails that exclude protected, school-name, location, and grade-based signals from scoring
 
 ## Quick Start
@@ -46,9 +46,9 @@ The production analysis flow is:
 
 `src/app/page.tsx` -> `/api/analyze` -> `src/app/lib/deepseekEnhancer.ts`
 
-The resume generation flow is:
+The resume generation and preview flow is:
 
-`src/app/result/page.tsx` -> `src/app/resume-builder/page.tsx` -> `/api/generate-resume` -> `src/app/lib/resumeGenerator.ts`
+`src/app/result/page.tsx` -> `src/app/resume-builder/page.tsx` -> `/api/generate-resume` -> `src/app/lib/resumeGenerator.ts` -> `src/app/resume-preview/page.tsx`
 
 Older local/OpenAI analyzer modules remain for legacy tests and experiments, but the main app uses the DeepSeek enhancer path.
 
@@ -73,7 +73,7 @@ npx jest --config jest.config.ts src/app/lib/__tests__/ src/app/api/__tests__/ s
 - PDF parsing must extract a readable text layer; scanned/image-only PDFs may fail until OCR is added.
 - The API logs request metadata and text lengths, not resume or job-description previews.
 - New response fields are optional and backward compatible with existing clients.
-- The generator returns a downloadable `.tex` file. It does not compile LaTeX to PDF server-side.
+- The generator returns both a structured HTML preview model and a downloadable `.tex` file. It does not compile LaTeX to PDF server-side.
 - Resume-builder profile fields are extracted for prefill only and are not used in scoring.
 
 ## License

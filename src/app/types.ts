@@ -87,8 +87,36 @@ export interface ResumeGenerationQuestion {
   multiline?: boolean;
 }
 
+export interface GeneratedResumePreviewItem {
+  heading: string;
+  subheading?: string;
+  meta?: string;
+  date?: string;
+  details: string[];
+}
+
+export interface GeneratedResumePreviewSection {
+  title: string;
+  items: GeneratedResumePreviewItem[];
+}
+
+export interface GeneratedResumePreviewSkillGroup {
+  label: string;
+  skills: string[];
+}
+
+export interface GeneratedResumePreview {
+  fullName: string;
+  contact: string[];
+  headline?: string;
+  summary?: string;
+  sections: GeneratedResumePreviewSection[];
+  skillGroups: GeneratedResumePreviewSkillGroup[];
+}
+
 export interface GeneratedResume {
   latex: string;
+  preview: GeneratedResumePreview;
   tailoringNotes: string[];
   assumptions: string[];
   followUpQuestions: string[];

@@ -66,6 +66,28 @@ describe('ResumeGenerator', () => {
 \begin{document}
 Jane Doe
 \end{document}`,
+        preview: {
+          fullName: 'Jane Doe',
+          contact: ['jane@example.com', 'linkedin.com/in/jane'],
+          headline: 'Frontend Engineer',
+          summary: 'Frontend engineer focused on React delivery.',
+          sections: [
+            {
+              title: 'Experience',
+              items: [
+                {
+                  heading: 'Frontend Engineer',
+                  subheading: 'Acme',
+                  date: '2022 - Present',
+                  details: ['Reduced React page load time by 30 percent.'],
+                },
+              ],
+            },
+          ],
+          skillGroups: [
+            { label: 'Languages', skills: ['TypeScript', 'JavaScript'] },
+          ],
+        },
         tailoringNotes: ['Tailored to React role requirements.'],
         assumptions: [],
         followUpQuestions: ['What AWS deployment evidence should be included?'],
@@ -73,10 +95,10 @@ Jane Doe
     }) as jest.Mock;
   });
 
-  it('renders context from the analysis and generates a LaTeX resume', async () => {
+  it('renders context from the analysis and stores a generated resume preview', async () => {
     render(<ResumeGenerator analysis={mockAnalysis} jobDescription="Frontend role requiring React." />);
 
-    expect(screen.getByText('Generate Tailored LaTeX Resume')).toBeInTheDocument();
+    expect(screen.getByText('Generate Tailored Resume')).toBeInTheDocument();
     expect(screen.getByText('Extracted Profile')).toBeInTheDocument();
     expect(screen.getByText('Targeted Follow-up Questions')).toBeInTheDocument();
     expect(screen.getByText('Add impact metrics')).toBeInTheDocument();
@@ -85,7 +107,7 @@ Jane Doe
     expect(screen.getByDisplayValue('Frontend Engineer')).toBeInTheDocument();
     expect(screen.getByDisplayValue(/jane@example\.com/)).toBeInTheDocument();
 
-    const generateButton = screen.getByRole('button', { name: 'Generate LaTeX Resume' });
+    const generateButton = screen.getByRole('button', { name: 'Generate Resume Preview' });
     expect(generateButton).not.toBeDisabled();
     fireEvent.change(screen.getByPlaceholderText(/Reduced page load time/), {
       target: { value: 'Reduced React page load time by 30 percent.' },
@@ -98,9 +120,11 @@ Jane Doe
       }));
     });
 
-    expect(await screen.findByText('Generated Output')).toBeInTheDocument();
-    expect(screen.getByDisplayValue(/\\documentclass\{article\}/)).toBeInTheDocument();
-    expect(screen.getByText('Tailored to React role requirements.')).toBeInTheDocument();
-    expect(screen.getByText('What AWS deployment evidence should be included?')).toBeInTheDocument();
+    await waitFor(() => {
+      const stored = sessionStorage.getItem('latestGeneratedResume');
+      expect(stored).toBeTruthy();
+      expect(JSON.parse(stored as string).preview.fullName).toBe('Jane Doe');
+    });
+    expect(screen.queryByText('Generated Output')).not.toBeInTheDocument();
   });
 });

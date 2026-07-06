@@ -10,9 +10,33 @@ Jane Doe
       tailoringNotes: ['Targets React requirements', 'Targets React requirements'],
       assumptions: ['Dates were omitted where not supplied.'],
       followUpQuestions: ['What metric proves the frontend impact?'],
+      preview: {
+        fullName: 'Jane Doe',
+        contact: ['jane@example.com', 'github.com/jane'],
+        headline: 'Frontend Engineer',
+        summary: 'Frontend engineer focused on React delivery.',
+        sections: [
+          {
+            title: 'Experience',
+            items: [
+              {
+                heading: 'Frontend Engineer',
+                subheading: 'Acme',
+                date: '2022 - Present',
+                details: ['Built React interfaces for analytics workflows.'],
+              },
+            ],
+          },
+        ],
+        skillGroups: [
+          { label: 'Languages', skills: ['TypeScript', 'JavaScript'] },
+        ],
+      },
     });
 
     expect(result.latex).toContain(String.raw`\documentclass{article}`);
+    expect(result.preview.fullName).toBe('Jane Doe');
+    expect(result.preview.sections[0].items[0].details).toEqual(['Built React interfaces for analytics workflows.']);
     expect(result.tailoringNotes).toEqual(['Targets React requirements']);
     expect(result.assumptions).toEqual(['Dates were omitted where not supplied.']);
     expect(result.followUpQuestions).toEqual(['What metric proves the frontend impact?']);
@@ -26,6 +50,7 @@ Jane Doe
     });
 
     expect(result.latex).toContain(String.raw`\documentclass[letterpaper,11pt]{article}`);
+    expect(result.preview.fullName).toBeTruthy();
     expect(result.latex).toContain(String.raw`\input{glyphtounicode}`);
     expect(result.latex).toContain(String.raw`\begin{document}`);
     expect(result.latex).toContain(String.raw`\section{Experience}`);

@@ -24,16 +24,6 @@ export default function JobDescription({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-      setDescription('');
-    } else {
-      // Clear file if input was cleared
-      setFile(null);
-    }
-  };
-
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDescription(e.target.value);
     // Clear file if text is entered

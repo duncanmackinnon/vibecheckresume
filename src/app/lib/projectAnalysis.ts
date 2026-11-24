@@ -42,7 +42,7 @@ export async function analyzeProject(includeQuality = false): Promise<ProjectAna
     'utf-8'
   );
 
-  const resumeAnalysis = analyzeResume(testResume, testJob);
+  analyzeResume(testResume, testJob);
 
   // Identify technical debt
   const technicalDebt: TechnicalDebt = {

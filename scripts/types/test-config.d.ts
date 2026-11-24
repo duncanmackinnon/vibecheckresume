@@ -9,7 +9,7 @@ declare global {
       TEST_TIMEOUT?: string;
 
       // API Keys
-      OPENAI_API_KEY: string;
+      OPENAI_API_KEY?: string;
 
       // Email Configuration
       SMTP_HOST?: string;

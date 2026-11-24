@@ -2,13 +2,11 @@ import { createWorker, Worker } from 'tesseract.js';
 import * as tf from '@tensorflow/tfjs';
 import * as use from '@tensorflow-models/universal-sentence-encoder';
 import type { TextItem, TextMarkedContent } from 'pdfjs-dist/types/src/display/api';
-import { Buffer } from 'buffer';
 
 // Configuration
 const CHUNK_SIZE = 1000;
 const CHUNK_OVERLAP = 200;
 const MIN_TEXT_LENGTH = 50;
-const OCR_TIMEOUT = 30000;
 
 interface ProcessedChunk {
   text: string;
@@ -120,6 +118,7 @@ export class PDFRAGProcessor {
       canvas.width = viewport.width;
 
       await page.render({
+        canvas,
         canvasContext: context!,
         viewport
       }).promise;
@@ -142,7 +141,7 @@ export class PDFRAGProcessor {
     if (!this.useModel) throw new Error('Model not loaded');
 
     const paragraphs = fullText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-    let chunks: ProcessedChunk[] = [];
+    const chunks: ProcessedChunk[] = [];
 
     for (const para of paragraphs) {
       if (para.length > CHUNK_SIZE) {

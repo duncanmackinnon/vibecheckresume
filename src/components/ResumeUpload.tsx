@@ -3,10 +3,6 @@
 import { useEffect, useState } from 'react';
 import { analyzeResume } from '../app/lib/deepseek';
 
-interface PDFTextResult {
-  text: string;
-  success: boolean;
-}
 import FileUpload from './FileUpload';
 import JobDescription from './JobDescription';
 import AnalysisResult from './AnalysisResult';
@@ -19,7 +15,6 @@ export default function ResumeUpload() {
   const [error, setError] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [isEnvironmentValid, setIsEnvironmentValid] = useState(true);
-  const supportedFileTypes = ['application/pdf', 'text/plain'];
 
   useEffect(() => {
     // Check environment configuration on client-side

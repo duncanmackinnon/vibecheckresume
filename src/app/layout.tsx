@@ -1,13 +1,9 @@
 import './globals.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { env } from '@/utils/env';
-
-// Validate environment variables on app start
-env.validate();
 
 export const metadata = {
-  title: 'Resume Analyzer',
-  description: 'Match your resume against job descriptions',
+  title: 'VibeCheck — Your next chapter',
+  description: 'A thoughtful home for your job search. Track applications, prepare resumes, and keep moving forward.',
 };
 
 export default function RootLayout({

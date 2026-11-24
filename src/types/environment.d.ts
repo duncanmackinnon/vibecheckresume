@@ -8,7 +8,7 @@ declare global {
       NEXT_PUBLIC_APP_URL: string;
       
       // Deepseek Configuration
-      DEEPSEEK_API_KEY: string;
+      DEEPSEEK_API_KEY?: string;
       
       // Rate Limiting
       RATE_LIMIT: string;

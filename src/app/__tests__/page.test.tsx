@@ -1,30 +1,23 @@
-import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import Page from '../page';
-import { expect, test } from '@jest/globals';
 
-test('renders the main page', () => {
-  render(<Page />);
-  expect(screen.getByText('Resume Match Analyzer')).toBeInTheDocument();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn(), refresh: jest.fn() }) }));
+beforeEach(() => {
+  sessionStorage.clear();
+  (global.fetch as jest.Mock).mockResolvedValue({ ok: true, json: async () => ({ authenticated: false, profile: null, connection: null, capabilities: { auth: false, database: false, storage: false, deepseek: false, openai: false } }) });
 });
 
-test('handles file upload and job description input', async () => {
-  render(<Page />);
-  
-  const fileInput = screen.getByLabelText('Upload Resume');
-  const textarea = screen.getByPlaceholderText('Paste the job description here...');
-  const submitButton = screen.getByText('Analyze Resume');
-
-  // Test form validation
-  fireEvent.click(submitButton);
-  expect(submitButton).toBeDisabled();
-
-  // Test file upload
-  const file = new File(['test content'], 'resume.pdf', { type: 'application/pdf' });
-  fireEvent.change(fileInput, { target: { files: [file] } });
-  
-  // Test text input
-  fireEvent.change(textarea, { target: { value: 'Test job description' } });
-  
-  expect(submitButton).not.toBeDisabled();
+test('starts with the name and preserves it before sign-in', async () => {
+  const first = render(<Page />);
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('What’s your name?');
+  expect(screen.getByRole('link', { name: 'Explore a sample' })).toHaveAttribute('href', '/dashboard?preview=1');
+  await screen.findByText('Session preview');
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your name' }), { target: { value: 'Jordan' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Let’s get started, Jordan.');
+  await waitFor(() => expect(sessionStorage.getItem('vibecheck:onboarding:v1')).toContain('Jordan'));
+  first.unmount(); render(<Page />);
+  expect(await screen.findByRole('button', { name: /Answer a few questions/ })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Let’s get started, Jordan.');
+  expect(global.fetch).toHaveBeenCalledTimes(2);
 });

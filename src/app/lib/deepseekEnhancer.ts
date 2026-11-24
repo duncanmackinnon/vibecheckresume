@@ -31,7 +31,7 @@ async function initializeOpenAI() {
       });
       console.log('OpenAI client initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize OpenAI client:', error);
+      console.error('Failed to initialize DeepSeek client.');
       throw new Error('Failed to initialize AI client');
     }
   }
@@ -686,10 +686,7 @@ async function runAIAnalysis(resumeText: string, jobDescription: string): Promis
     try {
       return ensureSerializable(normalizeAIAnalysis(parseJsonContent(content)));
     } catch (parseError) {
-      console.warn('AI response was not valid JSON. Requesting AI repair.', {
-        message: parseError instanceof Error ? parseError.message : String(parseError),
-        responsePreview: content.slice(0, 500),
-      });
+      console.warn('AI response was not valid JSON. Requesting AI repair.');
 
       const repairedContent = await requestDeepSeekContent(client, [
         {
@@ -703,12 +700,7 @@ async function runAIAnalysis(resumeText: string, jobDescription: string): Promis
       return ensureSerializable(normalizeAIAnalysis(parseJsonContent(repairedContent)));
     }
   } catch (apiError: any) {
-    console.error('DeepSeek analysis error:', {
-      error: apiError,
-      status: apiError?.status,
-      message: apiError?.message,
-      response: apiError?.response,
-    });
+    console.error('DeepSeek analysis failed.', { status: apiError?.status });
     throw new Error('AI analysis failed. Please try again.');
   }
 }
@@ -748,7 +740,6 @@ async function createDeepSeekCompletion(client: any, messages: ChatMessage[]) {
 
     console.warn('DeepSeek JSON mode was rejected; retrying the same AI request without response_format.', {
       status: error?.status,
-      message,
     });
 
     const { response_format: _responseFormat, ...fallbackParams } = params;
@@ -760,17 +751,5 @@ async function createDeepSeekCompletion(client: any, messages: ChatMessage[]) {
  * Main analysis function. It returns only AI-generated analysis.
  */
 export async function analyzeWithAI(resumeText: string, jobDescription: string): Promise<Analysis> {
-  try {
-    return await runAIAnalysis(resumeText, jobDescription);
-  } catch (error) {
-    console.error('Analysis failed:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
-    throw error;
-  }
+  return runAIAnalysis(resumeText, jobDescription);
 }

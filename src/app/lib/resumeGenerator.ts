@@ -36,7 +36,7 @@ async function initializeOpenAI() {
         baseURL: 'https://api.deepseek.com/',
       });
     } catch (error) {
-      console.error('Failed to initialize DeepSeek client for resume generation:', error);
+      console.error('Failed to initialize DeepSeek client for resume generation.');
       throw new Error('Failed to initialize AI client');
     }
   }
@@ -635,7 +635,6 @@ async function createDeepSeekCompletion(client: any, messages: ChatMessage[]) {
 
     console.warn('DeepSeek JSON mode was rejected for resume generation; retrying without response_format.', {
       status: error?.status,
-      message,
     });
 
     const { response_format: _responseFormat, ...fallbackParams } = params;
@@ -659,9 +658,7 @@ export async function generateTailoredResume(input: ResumeGenerationInput): Prom
     try {
       return ensureSerializable(normalizeGeneratedResume(parseJsonContent(content)));
     } catch (parseError) {
-      console.warn('Resume generation response was not valid JSON. Requesting repair.', {
-        message: parseError instanceof Error ? parseError.message : String(parseError),
-      });
+      console.warn('Resume generation response was not valid JSON. Requesting repair.');
 
       const repairedContent = await requestDeepSeekContent(client, [
         {
@@ -676,7 +673,6 @@ export async function generateTailoredResume(input: ResumeGenerationInput): Prom
   } catch (error: any) {
     console.error('DeepSeek resume generation error:', {
       status: error?.status,
-      message: error?.message,
     });
     throw new Error('Resume generation failed. Please try again.');
   }

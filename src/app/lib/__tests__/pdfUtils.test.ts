@@ -1,51 +1,17 @@
-jest.mock('pdf-parse/lib/pdf-parse.js', () => ({
-  __esModule: true,
-  default: jest.fn(),
-}));
-
+/** @jest-environment node */
+jest.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({ GlobalWorkerOptions: {}, getDocument: jest.fn() }));
 import { extractPdfText } from '../pdfUtils';
-
-const pdfParse = require('pdf-parse/lib/pdf-parse.js').default as jest.Mock;
-
-function createPdfFile(content: string): File {
-  const file = new File([content], 'resume.pdf', { type: 'application/pdf' });
-  const buffer = Buffer.from(content);
-  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
-
-  Object.defineProperty(file, 'arrayBuffer', {
-    value: jest.fn().mockResolvedValue(arrayBuffer),
-  });
-
-  return file;
-}
-
-describe('pdfUtils', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('extracts trimmed text from a PDF file', async () => {
-    pdfParse.mockResolvedValue({ text: '  Resume text from pdf.  ' });
-    const file = createPdfFile('pdf bytes');
-
-    await expect(extractPdfText(file)).resolves.toBe('Resume text from pdf.');
-    expect(pdfParse).toHaveBeenCalledWith(expect.any(Buffer), {
-      max: 0,
-      version: 'v2.0.550',
-    });
-  });
-
-  it('throws a clear error instead of falling back to binary file text', async () => {
-    pdfParse.mockRejectedValue(new Error('No readable text layer'));
-    const file = createPdfFile('%PDF binary-ish content');
-
-    await expect(extractPdfText(file)).rejects.toThrow(/Failed to extract text from PDF: No readable text layer/);
-  });
-
-  it('throws when the PDF parser returns no text', async () => {
-    pdfParse.mockResolvedValue({ text: '' });
-    const file = createPdfFile('pdf bytes');
-
-    await expect(extractPdfText(file)).rejects.toThrow(/PDF text extraction failed/);
-  });
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+const destroy = jest.fn();
+const mockDocument = jest.mocked(getDocument);
+test('rejects encrypted or unreadable PDFs without exposing parser input', async () => {
+  mockDocument.mockReturnValue({ promise: Promise.reject(new Error('private-document-content')), destroy } as never);
+  await expect(extractPdfText(new File(['%PDF'], 'resume.pdf'))).rejects.toThrow('Could not read this PDF');
+  expect(destroy).toHaveBeenCalled();
+});
+test('bounds documents before extracting their pages', async () => {
+  const getPage = jest.fn();
+  mockDocument.mockReturnValue({ promise: Promise.resolve({ numPages: 101, getPage }), destroy } as never);
+  await expect(extractPdfText(new File(['%PDF'], 'resume.pdf'))).rejects.toThrow('up to 100 pages');
+  expect(getPage).not.toHaveBeenCalled();
 });

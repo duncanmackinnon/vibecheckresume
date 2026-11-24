@@ -1,6 +1,6 @@
 import { OpenAI } from 'openai';
 import { Analysis } from '../types';
-import { ConfigurationError, handleOpenAIError, formatError } from './errors';
+import { ConfigurationError, formatError } from './errors';
 import { analyzeResume as localAnalyze } from './localAnalysis';
 
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.MOCK_OPENAI_RESPONSES === 'true';
@@ -8,7 +8,6 @@ const isTestEnv = process.env.NODE_ENV === 'test' || process.env.MOCK_OPENAI_RES
 // Initialize Deepseek client
 const apiKey = process.env.DEEPSEEK_API_KEY;
 
-console.log('OpenAI API Key from env:', apiKey ? '***' + apiKey.slice(-4) : 'NOT FOUND');
 
 let openai: OpenAI | null = null;
 
@@ -24,10 +23,6 @@ if (!apiKey || !apiKey.startsWith('sk-') || apiKey.length !== 51) {
     organization: process.env.OPENAI_ORG_ID
   };
 
-  console.log('OpenAI Client Configuration:', {
-    ...openaiConfig,
-    apiKey: openaiConfig.apiKey ? '***' + openaiConfig.apiKey.slice(-4) : undefined
-  });
 
   openai = new OpenAI(openaiConfig);
 }
@@ -57,7 +52,6 @@ export interface ResumeAnalysisPrompt {
 }
 
 export async function analyzeResume({ resumeText, jobDescription, signal }: ResumeAnalysisPrompt): Promise<Analysis> {
-  const startTime = Date.now();
   console.log('Starting resume analysis...');
   
   // Fallback to local analysis in tests or when OpenAI is not configured

@@ -18,6 +18,7 @@ interface AnalysisResultProps {
   priorityActions?: PriorityAction[];
   isChunked?: boolean;
   onNewAnalysis?: () => void;
+  embedded?: boolean;
 }
 
 const markdownComponents = {
@@ -54,7 +55,8 @@ export default function AnalysisResult({
   evaluation,
   roleRequirements,
   priorityActions,
-  onNewAnalysis
+  onNewAnalysis,
+  embedded = false,
 }: AnalysisResultProps) {
   const router = useRouter();
   const scoreColor = matchScore >= 80 ? 'green' : matchScore >= 60 ? 'yellow' : 'red';
@@ -93,7 +95,7 @@ export default function AnalysisResult({
                 <div className="clay-inset h-3 overflow-hidden rounded-full p-0.5">
                   <div
                     className={cn(
-                      'h-full rounded-full transition-all',
+                      'h-full rounded-full',
                       scoreColor === 'green' ? 'bg-emerald-500' : scoreColor === 'yellow' ? 'bg-amber-400' : 'bg-rose-400'
                     )}
                     style={{ width: `${Math.min(Math.max(matchScore, 0), 100)}%` }}
@@ -159,12 +161,11 @@ export default function AnalysisResult({
               <div className="prose prose-slate prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-li:my-1 max-w-none">
                 <ReactMarkdown components={markdownComponents}>{detailedAnalysis}</ReactMarkdown>
               </div>
-              <div className="sr-only">Your resume shows strong frontend skills</div>
             </div>
           </div>
         )}
 
-        <div className="flex flex-col gap-3 pt-2 sm:flex-row">
+        {!embedded && <div className="flex flex-col gap-3 pt-2 sm:flex-row">
           <button
             onClick={() => window.print()}
             className="clay-button flex-1 px-4 py-3 text-sm font-bold text-white"
@@ -180,7 +181,7 @@ export default function AnalysisResult({
           >
             Analyze Another
           </button>
-        </div>
+        </div>}
       </div>
     </section>
   );

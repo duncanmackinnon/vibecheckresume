@@ -12,12 +12,12 @@ import {
 describe('Error Handling', () => {
   describe('formatError', () => {
     it('formats OpenAI API errors correctly', () => {
-      const error = new OpenAI.APIError(401, { message: 'Invalid key' }, 'invalid_key', {});
+      const error = new OpenAI.APIError(401, { message: 'Invalid key' }, 'invalid_key', new Headers());
       expect(formatError(error)).toBe('Authentication failed. Please check your API key.');
     });
 
     it('formats rate limit errors', () => {
-      const error = new OpenAI.APIError(429, { message: 'Too many requests' }, 'rate_limit', {});
+      const error = new OpenAI.APIError(429, { message: 'Too many requests' }, 'rate_limit', new Headers());
       expect(formatError(error)).toBe('Rate limit exceeded. Please try again in a few moments.');
     });
 
@@ -98,7 +98,7 @@ describe('Error Handling', () => {
         401,
         { message: 'Invalid API key' },
         'invalid_key',
-        {}
+        new Headers()
       );
 
       expect(() => handleOpenAIError(openAIError))
@@ -110,7 +110,7 @@ describe('Error Handling', () => {
         429,
         { message: 'Rate limit exceeded' },
         'rate_limit',
-        {}
+        new Headers()
       );
 
       try {

@@ -21,7 +21,7 @@ export const env = {
    * Validate required environment variables
    */
   validate() {
-    const required = ['DEEPSEEK_API_KEY'];
+    const required: string[] = [];
     const missing = required.filter(key => !process.env[key]);
 
     if (this.isProduction && missing.length > 0) {

@@ -1,4 +1,4 @@
-import 'openai/shims/node';
+
 import '@testing-library/jest-dom';
 import React from 'react';
 import { TextDecoder, TextEncoder } from 'util';
@@ -183,7 +183,7 @@ export const mockSuccessfulFileRead = (content: string) => {
   mockFileReader.readAsText.mockImplementation(function(this: MockFileReaderInstance) {
     setTimeout(() => {
       this.result = content;
-      this.onload && this.onload({ target: this });
+      this.onload?.({ target: this });
     });
   });
 };
@@ -192,7 +192,7 @@ export const mockFailedFileRead = (error: string) => {
   mockFileReader.readAsText.mockImplementation(function(this: MockFileReaderInstance) {
     setTimeout(() => {
       this.error = new Error(error);
-      this.onerror && this.onerror({ target: this });
+      this.onerror?.({ target: this });
     });
   });
 };
@@ -206,7 +206,7 @@ afterEach(() => {
   mockFileReader.readAsDataURL.mockReset();
   
   // Clean up any document body changes
-  document.body.innerHTML = '';
+  if (typeof document !== 'undefined') document.body.innerHTML = '';
   
   // Reset fetch mock
   (global.fetch as jest.Mock).mockReset();

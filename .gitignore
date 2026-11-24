@@ -58,3 +58,10 @@ firebase-debug.log*
 
 .vercel
 .env*.local
+/.swc
+/src/app/.well-known/workflow/
+/.workflow-data/
+/playwright-report/
+/test-results/
+/playwright/.auth/
+/artifacts/

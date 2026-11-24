@@ -1,10 +1,4 @@
 declare module 'nodemailer' {
-  interface Transport {
-    name: string;
-    version: string;
-    send: Function;
-  }
-
   interface TransportOptions {
     host: string;
     port: number;

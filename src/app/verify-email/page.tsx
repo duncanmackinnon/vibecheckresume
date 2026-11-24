@@ -1,0 +1,4 @@
+import Link from 'next/link';
+export default function VerifyEmailPage() {
+  return <main className="clay-shell"><section className="clay-panel mx-auto max-w-xl p-8 sm:p-12"><p className="clay-kicker">ONE MORE STEP</p><h1 className="mt-4 text-3xl font-semibold">Check your email.</h1><p className="mt-4 text-sm leading-7 text-slate-600">Open the verification message sent when you signed up. After verifying your address, sign in again to refresh your account.</p><p className="mt-3 text-sm text-slate-500">Check your spam folder if it has not arrived. Password resets are available in the sign-in screen.</p><div className="mt-7 flex flex-wrap gap-3"><a className="clay-button px-5 py-3 font-semibold text-white" href="/auth/login?prompt=login&returnTo=%2Fonboarding">I’ve verified my email</a><Link className="clay-secondary-button px-5 py-3" href="/onboarding">Back to setup</Link></div></section></main>;
+}

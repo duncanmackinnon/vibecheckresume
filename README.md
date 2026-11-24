@@ -1,81 +1,45 @@
-# Resume Analyzer
+# VibeCheck
 
-AI-powered resume analyzer that compares a PDF or TXT resume against a pasted job description and returns evidence-backed ATS/job-fit feedback.
+A private job-search workspace with guided onboarding, sourced job discovery, an application board, tasks and interviews, saved resumes, and optional website AI. The core workflow is save a job, tailor a resume, and track the next step.
+
+The tracker uses Next.js 16 / React 19, Auth0, Supabase PostgreSQL and private Storage. DeepSeek handles resume AI; the optional website assistant and job discovery use a server-owned OpenAI API key with separate API billing. Users do not link ChatGPT subscriptions. See the [hosted product scope and alternative methods](docs/HOSTED_PRODUCT_PLAN.md). The supported [ChatGPT MCP plugin](docs/CHATGPT_MCP_SETUP.md) is an optional advanced connection, outside the core launch requirements.
+
+## Run locally
+
+Use Node 22. Install dependencies with `npm ci`, copy `.env.example` to `.env.local`, then run `npm run dev`. Preserve any existing credentials. Visit http://localhost:3000, or /dashboard?preview=1 for the clearly labeled read-only sample workspace. Building and exploring the preview require no service credentials.
+
+Real accounts and saved records require the managed services. Follow [setup and rollout instructions](docs/TRACKER_SETUP.md) for database migrations, restricted credentials, Auth0 sign-in, private uploads, and optional server AI.
+
+See the [verification record](docs/VERIFICATION.md) for the deployed preview, test results, and remaining hosted-service checks.
 
 ## Features
 
-- PDF and TXT resume uploads
-- DeepSeek-powered job-fit analysis
-- Evidence-backed category scorecard
-- Matched and missing skill extraction
-- Role requirement checklist
-- Prioritized resume fixes for job seekers
-- DeepSeek-powered resume builder that uses analysis evidence, targeted follow-up answers, a rendered preview, and LaTeX export
-- Fairness guardrails that exclude protected, school-name, location, and grade-based signals from scoring
+- Name-first onboarding with upload or guided resume creation, saved search preferences, and a personalized portal with top navigation.
+- Optional on-demand website job discovery with cited results, and duplicate-safe saving to Applications. Daily and weekly searches require explicit opt-in and remain outside the core launch scope.
+- Searchable board and table with fixed stages, priorities, tags, archive and restore.
+- Application details, contacts, notes, activity, dated follow-ups, and interviews with retained timezones.
+- Reusable private source resumes, application-specific analyses, saved builder answers, immutable generated versions and submitted-version selection.
+- Resume preview, browser print/PDF and LaTeX export. Old builder links lead to an explicit one-time import with application confirmation.
+- Saved website assistant conversations and validated tracker tools. An optional MCP plugin shares those tools with ChatGPT. Tools cannot send messages or submit applications.
+- Ownership checks plus PostgreSQL row policies, version conflict checks, retry-safe mutations, private signed file transfers and per-user AI limits.
 
-## Quick Start
+See [onboarding and discovery](docs/ONBOARDING_DISCOVERY.md) for the migration, separate discovery model, recurring-search behavior and preview limitations.
 
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Verify
 
-2. Configure environment:
-   ```bash
-   cp .env.example .env.local
-   ```
-
-3. Set your DeepSeek API key:
-   ```bash
-   DEEPSEEK_API_KEY=dsi-your-api-key-here
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open the printed local URL. If port `3000` is already occupied, run Next on another port:
-   ```bash
-   npm run dev -- --port 3011
-   ```
-
-## Active Analysis Path
-
-The production analysis flow is:
-
-`src/app/page.tsx` -> `/api/analyze` -> `src/app/lib/deepseekEnhancer.ts`
-
-The resume generation and preview flow is:
-
-`src/app/result/page.tsx` -> `src/app/resume-builder/page.tsx` -> `/api/generate-resume` -> `src/app/lib/resumeGenerator.ts` -> `src/app/resume-preview/page.tsx`
-
-Older local/OpenAI analyzer modules remain for legacy tests and experiments, but the main app uses the DeepSeek enhancer path.
-
-## Testing
-
-```bash
-npx tsc --noEmit --pretty false
-npm run test:lib -- --runInBand
-npm run test:api -- --runInBand
-npm run test:components -- --runInBand
+```sh
+npm run typecheck
+npm run lint
+npm test -- --runInBand
+npm run test:integration
+npm run test:e2e
+npm run build
 ```
 
-Useful direct targeted command:
+Unit tests mock providers. Integration tests exercise actual PostgreSQL policies in an isolated PGlite database. Browser tests exercise the preview and authenticated API fixtures without adding an authentication bypass to the app. Real hosted sign-in and provider execution still require preview-deployment validation with configured test accounts.
 
-```bash
-npx jest --config jest.config.ts src/app/lib/__tests__/ src/app/api/__tests__/ src/components/__tests__/ --runInBand
-```
+## Deploy
 
-## Development Notes
+Use Vercel with Node 22, apply additive Drizzle migrations with `npm run db:init`, then deploy a preview with the environment values described in the setup guide. Use a stable HTTPS origin for sign-in; optional MCP also requires public HTTPS. Production runtime must use the restricted database login; keep migration credentials off the deployment.
 
-- Upload limits are enforced in the client and API.
-- PDF parsing must extract a readable text layer; scanned/image-only PDFs may fail until OCR is added.
-- The API logs request metadata and text lengths, not resume or job-description previews.
-- New response fields are optional and backward compatible with existing clients.
-- The generator returns both a structured HTML preview model and a downloadable `.tex` file. It does not compile LaTeX to PDF server-side.
-- Resume-builder profile fields are extracted for prefill only and are not used in scoring.
-
-## License
-
-MIT. See [LICENSE](LICENSE).
+Email/calendar sync, job scraping, automatic submissions, billing and public ChatGPT directory submission are outside this release.

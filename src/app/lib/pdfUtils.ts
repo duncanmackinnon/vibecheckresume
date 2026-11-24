@@ -1,32 +1,31 @@
-/**
- * Extracts text content from a PDF file
- */
+/** Parse only the text layer. Disable executable PDF features and bound resource use. */
 export async function extractPdfText(file: File): Promise<string> {
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const task = pdfjs.getDocument({
+    data: new Uint8Array(await file.arrayBuffer()),
+    useSystemFonts: false, disableFontFace: true,
+    verbosity: 0, stopAtErrors: true,
+  });
   try {
-    // Dynamically import both pdf-parse and buffer
-    const [{ default: pdfParse }, { Buffer }] = await Promise.all([
-      import('pdf-parse/lib/pdf-parse.js'),
-      import('buffer')
-    ]);
-
-    // Convert File to Buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Parse PDF
-    const data = await pdfParse(buffer, {
-      max: 0, // No page limit
-      version: 'v2.0.550'
-    });
-
-    if (!data.text || typeof data.text !== 'string') {
-      throw new Error('PDF text extraction failed');
+    const document = await task.promise;
+    if (document.numPages > 100) throw new Error('Too many pages');
+    const pages: string[] = [];
+    let length = 0;
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber++) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const text = content.items.map(item => 'str' in item ? item.str + (item.hasEOL ? '\n' : ' ') : '').join('');
+      length += text.length;
+      if (length > 250_000) throw new Error('Too much text');
+      pages.push(text.trim());
+      page.cleanup();
     }
-
-    return data.text.trim();
-  } catch (error) {
-    console.error('Error extracting PDF text:', error);
-    const message = error instanceof Error ? error.message : 'Unknown PDF parsing error';
-    throw new Error(`Failed to extract text from PDF: ${message}`);
+    const text = pages.join('\n\n').trim();
+    if (!text) throw new Error('No text layer');
+    return text;
+  } catch {
+    throw new Error('Could not read this PDF. Use an unencrypted PDF with a text layer (up to 100 pages), or upload a text file.');
+  } finally {
+    await task.destroy();
   }
 }

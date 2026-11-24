@@ -27,7 +27,7 @@ declare module 'path' {
 declare namespace NodeJS {
   interface ProcessEnv {
     NODE_ENV: 'development' | 'production' | 'test';
-    OPENAI_API_KEY: string;
+    OPENAI_API_KEY?: string;
     [key: string]: string | undefined;
   }
 }

@@ -1,10 +1,12 @@
 import { NextRequest } from 'next/server';
 import { GET, HEAD } from '../health/route';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { validateApiKey } from '@/app/lib/utils';
 
 jest.mock('fs');
+jest.mock('os');
 jest.mock('path');
 jest.mock('@/app/lib/utils');
 
@@ -18,6 +20,7 @@ describe('Health Check API', () => {
     jest.clearAllMocks();
     (fs.existsSync as jest.Mock).mockReturnValue(true);
     (fs.accessSync as jest.Mock).mockReturnValue(undefined);
+    (os.tmpdir as jest.Mock).mockReturnValue('/mock/tmp');
     (path.join as jest.Mock).mockImplementation((...args) => args.join('/'));
     (validateApiKey as jest.Mock).mockReturnValue(true);
     jest.spyOn(Date, 'now').mockReturnValue(mockTime);
@@ -143,6 +146,15 @@ describe('Health Check API', () => {
       expect(response.status).toBe(503);
       expect(data.status).toBe('error');
       expect(data.services.filesystem).toBe(false);
+    });
+
+    it('should check os.tmpdir() instead of read-only cwd when running on Vercel', async () => {
+      process.env.VERCEL = '1';
+      const request = new NextRequest('http://localhost/api/health');
+      const response = await GET(request);
+
+      expect(response.status).toBe(200);
+      expect(fs.accessSync).toHaveBeenCalledWith('/mock/tmp', fs.constants.R_OK | fs.constants.W_OK);
     });
 
     it('should include proper cache control headers', async () => {

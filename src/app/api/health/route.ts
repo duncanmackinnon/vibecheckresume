@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { validateApiKey } from '@/app/lib/utils';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 
 interface HealthStatus {
@@ -89,9 +90,10 @@ async function checkServices(): Promise<HealthStatus['services']> {
   const apiKey = process.env.DEEPSEEK_API_KEY;
   services.deepseek = validateApiKey(apiKey);
 
-  // Check filesystem
+  // Check writable filesystem (Vercel /var/task is read-only; tmpdir is writable)
   try {
-    fs.accessSync(process.cwd(), fs.constants.R_OK | fs.constants.W_OK);
+    const writableDir = process.env.VERCEL ? os.tmpdir() : process.cwd();
+    fs.accessSync(writableDir, fs.constants.R_OK | fs.constants.W_OK);
     services.filesystem = true;
   } catch {
     services.filesystem = false;

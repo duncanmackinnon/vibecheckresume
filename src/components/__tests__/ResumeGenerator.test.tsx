@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import ResumeGenerator from '../ResumeGenerator';
-import type { Analysis } from '@/app/types';
+import type { Analysis, ResumeGenerationAnswers } from '@/app/types';
 
 const mockAnalysis: Analysis = {
   score: 82,
@@ -126,5 +126,53 @@ Jane Doe
       expect(JSON.parse(stored as string).preview.fullName).toBe('Jane Doe');
     });
     expect(screen.queryByText('Generated Output')).not.toBeInTheDocument();
+  });
+
+  it('supports controlled answers, custom onGenerate callback, and secondaryAction', async () => {
+    const onGenerate = jest.fn().mockResolvedValue(undefined);
+    const onKeepCurrent = jest.fn();
+
+    function ControlledWrapper() {
+      const [answers, setAnswers] = React.useState<ResumeGenerationAnswers>({
+        fullName: 'Jane Doe',
+        targetTitle: 'Frontend Engineer',
+        contactDetails: 'jane@example.com',
+        impactMetrics: '',
+      });
+      return (
+        <ResumeGenerator
+          analysis={mockAnalysis}
+          jobDescription="Frontend role requiring React."
+          answers={answers}
+          onAnswersChange={setAnswers}
+          onGenerate={onGenerate}
+          generateLabel="Build Custom Preview"
+          statusNote={<span>Ready to build</span>}
+          secondaryAction={
+            <button type="button" onClick={onKeepCurrent}>
+              Keep current resume instead
+            </button>
+          }
+        />
+      );
+    }
+
+    render(<ControlledWrapper />);
+    fireEvent.click(screen.getByRole('button', { name: 'Keep current resume instead' }));
+    expect(onKeepCurrent).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(screen.getByPlaceholderText(/Reduced page load time/), {
+      target: { value: 'Improved Lighthouse score to 99.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Build Custom Preview' }));
+
+    await waitFor(() => {
+      expect(onGenerate).toHaveBeenCalledWith(expect.objectContaining({
+        fullName: 'Jane Doe',
+        targetTitle: 'Frontend Engineer',
+        impactMetrics: 'Improved Lighthouse score to 99.',
+      }));
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

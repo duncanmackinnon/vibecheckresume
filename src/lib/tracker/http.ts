@@ -3,7 +3,14 @@ import { appBaseUrl } from './config';
 import { TrackerError } from './errors';
 export function assertSameOrigin(request:Request) {
   const origin=request.headers.get('origin');
-  if(origin && origin !== new URL(appBaseUrl()).origin) throw new TrackerError('This request origin is not allowed.',403,'FORBIDDEN');
+  if (origin) {
+    const allowedConfigured = origin === new URL(appBaseUrl()).origin;
+    let allowedRequestUrl = false;
+    if (!process.env.APP_BASE_URL) {
+      try { allowedRequestUrl = origin === new URL(request.url).origin; } catch { allowedRequestUrl = false; }
+    }
+    if (!allowedConfigured && !allowedRequestUrl) throw new TrackerError('This request origin is not allowed.',403,'FORBIDDEN');
+  }
   if(request.headers.get('sec-fetch-site')==='cross-site') throw new TrackerError('Cross-site changes are not allowed.',403,'FORBIDDEN');
 }
 export async function readJson(request:Request, maxBytes=1024*1024):Promise<any> {

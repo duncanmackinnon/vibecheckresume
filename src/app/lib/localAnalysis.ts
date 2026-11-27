@@ -3,15 +3,17 @@ import { Analysis } from '../types';
 const COMMON_SKILLS = {
   programming: [
     'javascript', 'typescript', 'python', 'java', 'c++', 'ruby', 'php',
-    'scala', 'kotlin', 'swift', 'rust', 'go'
+    'scala', 'kotlin', 'swift', 'rust', 'go', 'git', 'linux'
   ],
   frontend: [
     'react', 'vue', 'angular', 'html', 'css', 'sass', 'less', 'tailwind',
-    'bootstrap', 'material-ui', 'webpack', 'vite', 'nextjs', 'gatsby'
+    'tailwind css', 'bootstrap', 'material-ui', 'webpack', 'vite', 'nextjs',
+    'next.js', 'gatsby'
   ],
   backend: [
     'node', 'express', 'django', 'flask', 'spring', 'rails', 'laravel',
-    'asp.net', 'fastapi', 'graphql', 'rest'
+    'asp.net', 'fastapi', 'graphql', 'rest', 'rest api', 'prisma',
+    'drizzle', 'supabase', 'microservices'
   ],
   database: [
     'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch',
@@ -22,8 +24,22 @@ const COMMON_SKILLS = {
     'terraform', 'jenkins', 'ci/cd', 'devops'
   ],
   testing: [
-    'jest', 'mocha', 'cypress', 'selenium', 'testing', 'tdd', 'unit test',
-    'integration test', 'e2e test'
+    'jest', 'mocha', 'cypress', 'playwright', 'selenium', 'testing', 'tdd',
+    'unit test', 'integration test', 'e2e test'
+  ],
+  design: [
+    'figma', 'design systems', 'prototyping', 'wireframing', 'user research',
+    'usability testing', 'accessibility', 'wcag', 'interaction design',
+    'information architecture'
+  ],
+  product_and_ops: [
+    'product management', 'roadmapping', 'stakeholder management', 'a/b testing',
+    'jira', 'confluence', 'okr', 'kpi', 'customer success', 'salesforce',
+    'hubspot', 'seo'
+  ],
+  data: [
+    'excel', 'tableau', 'power bi', 'looker', 'snowflake', 'dbt', 'bigquery',
+    'pandas', 'statistics', 'data visualization', 'etl'
   ],
   soft_skills: [
     'leadership', 'communication', 'teamwork', 'problem-solving',
@@ -31,10 +47,50 @@ const COMMON_SKILLS = {
   ]
 };
 
+const DOMAIN_TERM_STOPWORDS = new Set([
+  'about', 'above', 'across', 'after', 'all', 'also', 'and', 'any', 'are', 'around',
+  'because', 'been', 'being', 'between', 'both', 'build', 'building', 'can', 'candidate',
+  'candidates', 'collaborate', 'company', 'create', 'day', 'degree', 'deliver', 'description',
+  'design', 'develop', 'developing', 'diverse', 'duties', 'ensure', 'environment', 'equal',
+  'etc', 'every', 'excellent', 'experience', 'experienced', 'fast', 'field', 'following',
+  'for', 'from', 'full', 'good', 'great', 'have', 'help', 'high', 'hiring', 'ideal',
+  'including', 'into', 'its', 'job', 'join', 'knowledge', 'large', 'lead', 'leading',
+  'like', 'looking', 'make', 'manage', 'management', 'may', 'more', 'most', 'must',
+  'new', 'not', 'office', 'one', 'only', 'opportunity', 'other', 'our', 'out', 'over',
+  'part', 'people', 'plus', 'position', 'preferred', 'qualifications', 'related', 'remote',
+  'required', 'requirements', 'responsibilities', 'responsible', 'role', 'salary', 'seeking',
+  'should', 'skills', 'small', 'some', 'strong', 'such', 'support', 'team', 'teams',
+  'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', 'this',
+  'through', 'time', 'tools', 'understanding', 'use', 'using', 'various', 'very',
+  'want', 'well', 'what', 'when', 'where', 'which', 'while', 'who', 'will', 'with',
+  'within', 'work', 'working', 'world', 'would', 'year', 'years', 'you', 'your'
+]);
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function findSkillMatches(text: string, skills: string[]): string[] {
-  return skills.filter(skill =>
-    text.toLowerCase().includes(skill.toLowerCase())
-  );
+  const lower = text.toLowerCase();
+  return skills.filter(skill => {
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(skill.toLowerCase())}(?:$|[^a-z0-9])`);
+    return pattern.test(lower);
+  });
+}
+
+function extractFallbackDomainTerms(jobDescription: string, existingSkills: string[], limit = 10): string[] {
+  const existing = new Set(existingSkills.map(skill => skill.toLowerCase()));
+  const counts = new Map<string, number>();
+  const tokens = jobDescription.toLowerCase().match(/[a-z][a-z0-9+#.-]{2,}/g) || [];
+  for (const raw of tokens) {
+    const token = raw.replace(/\.+$/, '');
+    if (token.length < 3 || DOMAIN_TERM_STOPWORDS.has(token) || existing.has(token)) continue;
+    counts.set(token, (counts.get(token) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([token]) => token);
 }
 
 function getSkillsCategory(skill: string): string {
@@ -142,7 +198,11 @@ function getCategorySpecificSuggestion(category: string, skills: string[]): stri
     database: `Practice database design and implementation using ${skills.join(', ')}`,
     cloud: `Obtain certifications in ${skills.slice(0, 2).join(' or ')} to validate your cloud expertise`,
     testing: `Implement comprehensive test suites using ${skills.join(', ')} in your projects`,
-    soft_skills: `Seek leadership or team projects to develop ${skills.join(', ')} abilities`
+    design: `Document user flows, wireframes, or design system work demonstrating ${skills.join(', ')}`,
+    product_and_ops: `Highlight measurable outcomes and stakeholder delivery using ${skills.join(', ')}`,
+    data: `Showcase dashboards, pipelines, or analytical projects built with ${skills.join(', ')}`,
+    soft_skills: `Seek leadership or team projects to develop ${skills.join(', ')} abilities`,
+    other: `Surface verifiable experience or coursework covering ${skills.slice(0, 4).join(', ')}`
   };
 
   return suggestions[category] || '';
@@ -150,7 +210,10 @@ function getCategorySpecificSuggestion(category: string, skills: string[]): stri
 
 export function analyzeResume(resumeText: string, jobDescription: string): Analysis {
   const allSkills = Object.values(COMMON_SKILLS).flat();
-  const jobSkills = findSkillMatches(jobDescription, allSkills);
+  const matchedCatalog = findSkillMatches(jobDescription, allSkills);
+  const jobSkills = matchedCatalog.length < 4
+    ? Array.from(new Set([...matchedCatalog, ...extractFallbackDomainTerms(jobDescription, matchedCatalog, 10 - matchedCatalog.length)]))
+    : matchedCatalog;
 
   const matchedSkills = jobSkills.map(skill => ({
     name: skill,

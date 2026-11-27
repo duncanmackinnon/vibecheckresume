@@ -45,7 +45,7 @@ async function generateResumeStep(input: ResumeJob): Promise<GeneratedResume> {
   'use step';
   const { generateTailoredResume } = await import('@/app/lib/resumeGenerator');
   if (!input.analysis) throw new Error('The saved analysis is unavailable.');
-  return generateTailoredResume({ analysis: input.analysis, jobDescription: input.jobDescription, answers: input.answers });
+  return generateTailoredResume({ sourceText: input.sourceText, analysis: input.analysis, jobDescription: input.jobDescription, answers: input.answers });
 }
 
 async function saveResumeResult(ownerId: string, jobId: string, attemptToken: string, output: Analysis | GeneratedResume) {

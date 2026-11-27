@@ -6,12 +6,14 @@ import { createRemoteJWKSet } from 'jose';
 import { verifyMcpAccessToken, assertConnectionActive } from '@/lib/mcp/verify-token';
 import { appBaseUrl, capabilities, mcpAudience } from './config';
 import { TrackerError } from './errors';
+import { getNativeSessionUser } from './native-auth';
 import { createRecord, getUser, listRecords, saveUser, updateRecord, withOwnerTransaction } from './store';
 import type { ConnectionData, User } from './types';
 let auth0:Auth0Client|undefined;
 export function authIssuer() { const domain=process.env.AUTH0_DOMAIN || ''; return `${domain.startsWith('https://')?domain:`https://${domain}`}`.replace(/\/$/,'')+'/'; }
 export function getAuth0() {
-  if(!capabilities().auth) throw new TrackerError('Sign-in is not configured for this deployment yet.',503,'AUTH_UNCONFIGURED');
+  const caps = capabilities();
+  if(!(caps.auth0 ?? caps.auth)) throw new TrackerError('Sign-in is not configured for this deployment yet.',503,'AUTH_UNCONFIGURED');
   return auth0 ??= new Auth0Client({
     appBaseUrl:appBaseUrl(), authorizationParameters:{scope:'openid profile email'}, signInReturnToPath:'/onboarding',
     enableAccessTokenEndpoint: false,
@@ -30,11 +32,25 @@ async function userForIdentity(subject:string,claims:{email?:unknown;name?:unkno
   const issuer=authIssuer(); const user={id:identityId(issuer,subject),email:typeof claims.email==='string'?claims.email:'',name:typeof claims.name==='string'?claims.name:'Job seeker'};
   if(persist) await saveUser(user,issuer,subject); return user;
 }
-export async function requireUser(_request?:Request):Promise<User> {
-  const session=await getAuth0().getSession();
-  if(!session?.user?.sub) throw new TrackerError('Sign in to access your workspace.',401,'UNAUTHENTICATED');
-  if (!assertEmailVerified(session.user)) throw new TrackerError('Verify your email address, then sign in again.',403,'EMAIL_UNVERIFIED');
-  return userForIdentity(session.user.sub,session.user);
+export async function requireUser(request?: Request): Promise<User> {
+  const nativeUser = await getNativeSessionUser(request);
+  if (nativeUser) return nativeUser;
+  const caps = capabilities();
+  if (!(caps.auth0 ?? caps.auth)) {
+    throw new TrackerError('Sign in to access your workspace.', 401, 'UNAUTHENTICATED');
+  }
+  const session = await getAuth0().getSession();
+  if (!session?.user?.sub) throw new TrackerError('Sign in to access your workspace.', 401, 'UNAUTHENTICATED');
+  if (!assertEmailVerified(session.user)) throw new TrackerError('Verify your email address, then sign in again.', 403, 'EMAIL_UNVERIFIED');
+  return userForIdentity(session.user.sub, session.user);
+}
+
+export async function getOptionalUser(request?: Request): Promise<User | null> {
+  try {
+    return await requireUser(request);
+  } catch {
+    return null;
+  }
 }
 let jwks:ReturnType<typeof createRemoteJWKSet>|undefined;
 export async function requireMcpUser(request:Request,requiredScopes:string[]):Promise<User> {

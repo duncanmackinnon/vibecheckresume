@@ -2,11 +2,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 import type { Analysis, GeneratedResume } from '@/app/types';
+import { analyzeWithAI } from '@/app/lib/deepseekEnhancer';
+import { generateTailoredResume } from '@/app/lib/resumeGenerator';
+import { capabilities } from '@/lib/tracker/config';
 import { getApplication } from '@/lib/tracker/service';
 import { createRecord, getRecord, idempotent, listRecords, updateRecord, withOwnerTransaction } from '@/lib/tracker/store';
 import type { ApplicationData, RecordKind, StoredRecord } from '@/lib/tracker/types';
+import { persistResumeResult } from './persistence';
 import type { ResumeAnalysis, ResumeDraft, ResumeJob, ResumeVersion, ResumeWorkspaceData, ResumeWorkspaceSummaryData, SourceResume } from './types';
-import { analysisSchema, answersSchema, completeAnswers, generatedResumeSchema, resumeIdSchema, validateUpload } from './validation';
+import { analysisSchema, answersSchema, completeAnswers, generatedResumeSchema, resumeIdSchema, SaveSessionBundleSchema, validateUpload } from './validation';
 import { privateResumeStorage, readUpload } from './storage';
 
 const key = z.string().uuid();
@@ -14,11 +18,13 @@ const app = { applicationId: resumeIdSchema };
 export const resumeActionSchemas = {
   list_resumes: z.object({ applicationId: resumeIdSchema.optional() }),
   get_resume: z.object({ id: resumeIdSchema, kind: z.enum(['source_resume', 'analysis', 'resume_version']) }),
+  save_source_preview: z.object({ id: resumeIdSchema, generatedResume: generatedResumeSchema }),
   analyze_resume: z.object({ ...app, sourceResumeId: resumeIdSchema, idempotencyKey: key }),
   get_resume_questions: z.object({ ...app, analysisId: resumeIdSchema }),
   save_resume_draft: z.object({ ...app, analysisId: resumeIdSchema, answers: answersSchema, expectedVersion: z.number().int().positive().optional() }),
   generate_resume: z.object({ ...app, analysisId: resumeIdSchema, answers: answersSchema, idempotencyKey: key }),
   select_submitted_resume: z.object({ ...app, versionId: resumeIdSchema, expectedVersion: z.number().int().positive() }),
+  select_current_resume: z.object({ ...app, sourceResumeId: resumeIdSchema, expectedVersion: z.number().int().positive() }),
   get_ai_job: z.object({ id: resumeIdSchema }),
   retry_ai_job: z.object({ id: resumeIdSchema, expectedVersion: z.number().int().positive() }),
 } as const;
@@ -53,7 +59,7 @@ export async function listResumeWorkspace(ownerId: string, applicationId?: strin
   const related = <T>(records: StoredRecord<T>[]) => records.filter(record => !applicationId || record.applicationId === applicationId);
   // File bytes are private; extracted resume text is returned only for an explicit owned-record read.
   const reconciledJobs = await Promise.all(related(jobs).map(job => reconcileResumeJob(ownerId, job)));
-  return { sources: sources.map(record => ({ ...record, data: { ...record.data, text: '', storagePath: '', starterAnswers: undefined, generatedResume: undefined } })), analyses: related(analyses), drafts: related(drafts), versions: related(versions), jobs: reconciledJobs.map(publicJob) };
+  return { sources: sources.map(record => ({ ...record, data: { ...record.data, hasPreview: Boolean(record.data.generatedResume), text: '', storagePath: '', fileBase64: undefined, starterAnswers: undefined, generatedResume: undefined } })), analyses: related(analyses), drafts: related(drafts), versions: related(versions), jobs: reconciledJobs.map(publicJob) };
 }
 
 export function publicJob(job: StoredRecord<ResumeJob>): StoredRecord<ResumeJob> {
@@ -64,7 +70,7 @@ export async function listResumeSummaries(ownerId: string, applicationId?: strin
   const data = await listResumeWorkspace(ownerId, applicationId);
   return {
     summariesOnly: true,
-    sources: data.sources.map(record => ({ ...record, data: { filename: record.data.filename, mimeType: record.data.mimeType, size: record.data.size, origin: record.data.origin } })),
+    sources: data.sources.map(record => ({ ...record, data: { filename: record.data.filename, mimeType: record.data.mimeType, size: record.data.size, origin: record.data.origin, hasPreview: record.data.hasPreview } })),
     analyses: data.analyses.map(record => ({ ...record, data: { sourceResumeId: record.data.sourceResumeId, score: record.data.analysis.score } })),
     drafts: data.drafts.map(record => ({ ...record, data: { analysisId: record.data.analysisId } })),
     versions: data.versions.map(record => ({ ...record, data: { analysisId: record.data.analysisId, sourceResumeId: record.data.sourceResumeId, label: record.data.label, fullName: record.data.generatedResume.preview.fullName, headline: record.data.generatedResume.preview.headline } })),
@@ -123,12 +129,22 @@ export async function completeResumeUpload(ownerId: string, input: unknown) {
   return createRecord<SourceResume>(ownerId, 'source_resume', { filename: intent.filename, mimeType: intent.mimeType, size: intent.size, storagePath: intent.storagePath, text, sha256: intent.sha256 }, { id: intent.id });
 }
 
-/** Server-side convenience used by import integrations; hosted browser uploads use signed URLs. */
+/** Server-side convenience used by import and PostgreSQL direct uploads; hosted deployments may also use signed Supabase URLs. */
 export async function uploadResume(ownerId: string, file: File, idempotencyKey: string) {
-  const { mimeType, bytes } = await readUpload(file);
-  const input: ResumeUploadInput = { filename: file.name, mimeType, size: file.size, sha256: createHash('sha256').update(Buffer.from(bytes)).digest('hex'), idempotencyKey };
+  const { mimeType, bytes, text } = await readUpload(file);
+  const sha256 = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
+  const input: ResumeUploadInput = { filename: file.name, mimeType, size: file.size, sha256, idempotencyKey };
   const intent = await uploadIntent(ownerId, input);
-  if (await findResumeRecord(ownerId, 'source_resume', intent.id)) return requiredRecord<SourceResume>(ownerId, 'source_resume', intent.id);
+  const existing = await findResumeRecord<SourceResume>(ownerId, 'source_resume', intent.id);
+  if (existing) return existing;
+  if (!capabilities().storage) {
+    return createRecord<SourceResume>(
+      ownerId,
+      'source_resume',
+      { filename: file.name, mimeType, size: file.size, storagePath: '', fileBase64: Buffer.from(bytes).toString('base64'), text, sha256 },
+      { id: intent.id },
+    );
+  }
   const uploaded = await privateResumeStorage().upload(intent.storagePath, bytes, { contentType: mimeType, upsert: false });
   if (uploaded.error && !/already exists|duplicate/i.test(uploaded.error.message)) throw new ResumeError('The private upload could not be saved. Please try again.', 503);
   return completeResumeUpload(ownerId, input);
@@ -136,7 +152,12 @@ export async function uploadResume(ownerId: string, file: File, idempotencyKey: 
 
 export async function downloadResume(ownerId: string, id: string) {
   const resume = await requiredRecord<SourceResume>(ownerId, 'source_resume', resumeIdSchema.parse(id));
-  if (resume.data.origin === 'builder' && !resume.data.storagePath) return {resume, data: new Blob([resume.data.text], {type: 'text/plain;charset=utf-8'})};
+  if (!resume.data.storagePath) {
+    if (resume.data.fileBase64) {
+      return { resume, data: new Blob([Buffer.from(resume.data.fileBase64, 'base64')], { type: resume.data.mimeType }) };
+    }
+    return { resume, data: new Blob([resume.data.text], { type: 'text/plain;charset=utf-8' }) };
+  }
   const { data, error } = await privateResumeStorage().download(resume.data.storagePath);
   if (error || !data) throw new ResumeError('The resume file could not be downloaded. Please try again.', 503);
   return { resume, data };
@@ -172,7 +193,40 @@ async function dispatchJob(ownerId: string, job: StoredRecord<ResumeJob>) {
       const current = await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id);
       if (current.data.attemptToken === job.data.attemptToken) await updateRecord(ownerId, 'ai_job', current.id, { ...current.data, runId: run.runId }, current.version);
     });
-  } catch {
+  } catch (dispatchError) {
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        await withOwnerTransaction(ownerId, async () => {
+          const current = await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id);
+          if (current.data.attemptToken === job.data.attemptToken && current.data.status === 'queued') {
+            await updateRecord(ownerId, 'ai_job', current.id, { ...current.data, status: 'running' }, current.version);
+          }
+        });
+        if (job.data.operation === 'analyze') {
+          const analysis = await analyzeWithAI(job.data.sourceText, job.data.jobDescription);
+          await persistResumeResult(ownerId, job.id, job.data.attemptToken, analysis);
+        } else {
+          if (!job.data.analysis) throw new ResumeError('Analyze the resume before generating a tailored version.');
+          const generatedResume = await generateTailoredResume({
+            sourceText: job.data.sourceText,
+            analysis: job.data.analysis,
+            jobDescription: job.data.jobDescription,
+            answers: job.data.answers,
+          });
+          await persistResumeResult(ownerId, job.id, job.data.attemptToken, generatedResume);
+        }
+        return publicJob(await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id));
+      } catch (inlineError) {
+        const message = inlineError instanceof Error ? inlineError.message : dispatchError instanceof Error ? dispatchError.message : 'The resume AI request failed.';
+        await withOwnerTransaction(ownerId, async () => {
+          const current = await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id);
+          if (current.data.attemptToken === job.data.attemptToken && ['queued', 'running'].includes(current.data.status)) {
+            await updateRecord(ownerId, 'ai_job', current.id, { ...current.data, status: 'failed', error: message }, current.version);
+          }
+        });
+        return publicJob(await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id));
+      }
+    }
     await withOwnerTransaction(ownerId, async () => {
       const current = await requiredRecord<ResumeJob>(ownerId, 'ai_job', job.id);
       if (current.data.attemptToken === job.data.attemptToken && current.data.status === 'queued') {
@@ -201,13 +255,27 @@ async function queueJob(ownerId: string, applicationId: string, idempotencyKey: 
 
 export async function executeResumeAction(ownerId: string, action: ResumeAction, input: unknown): Promise<unknown> {
   switch (action) {
+    case 'save_source_preview': {
+      const args = resumeActionSchemas.save_source_preview.parse(input);
+      return withOwnerTransaction(ownerId, async () => {
+        const source = await requiredRecord<SourceResume>(ownerId, 'source_resume', args.id);
+        const savedPreview = generatedResumeSchema.safeParse(source.data.generatedResume);
+        if (!savedPreview.success || !isDeepStrictEqual(savedPreview.data, args.generatedResume)) {
+          await updateRecord<SourceResume>(ownerId, 'source_resume', source.id, {
+            ...source.data,
+            generatedResume: args.generatedResume,
+          }, source.version);
+        }
+        return { id: source.id };
+      });
+    }
     case 'list_resumes': {
       const args = resumeActionSchemas.list_resumes.parse(input); return listResumeSummaries(ownerId, args.applicationId);
     }
     case 'get_resume': {
       const args = resumeActionSchemas.get_resume.parse(input);
       const record = await requiredRecord<Record<string, unknown>>(ownerId, args.kind, args.id);
-      if (args.kind === 'source_resume') return { ...record, data: { ...record.data, storagePath: undefined }, downloadUrl: `/api/resumes/${record.id}?download=1` };
+      if (args.kind === 'source_resume') return { ...record, data: { ...record.data, storagePath: undefined, fileBase64: undefined }, downloadUrl: `/api/resumes/${record.id}?download=1` };
       return record;
     }
     case 'analyze_resume': {
@@ -248,8 +316,15 @@ export async function executeResumeAction(ownerId: string, action: ResumeAction,
       const args = resumeActionSchemas.select_submitted_resume.parse(input);
       await requiredRecord<ResumeVersion>(ownerId, 'resume_version', args.versionId, args.applicationId);
       const application = await requiredRecord<ApplicationData>(ownerId, 'application', args.applicationId);
-      if (application.data.submittedResumeVersionId === args.versionId) return application;
-      return updateRecord(ownerId, 'application', application.id, { ...application.data, submittedResumeVersionId: args.versionId }, args.expectedVersion);
+      if (application.data.submittedResumeVersionId === args.versionId && !application.data.submittedSourceResumeId) return application;
+      return updateRecord(ownerId, 'application', application.id, { ...application.data, submittedResumeVersionId: args.versionId, submittedSourceResumeId: null }, args.expectedVersion);
+    }
+    case 'select_current_resume': {
+      const args = resumeActionSchemas.select_current_resume.parse(input);
+      await requiredRecord<SourceResume>(ownerId, 'source_resume', args.sourceResumeId);
+      const application = await requiredRecord<ApplicationData>(ownerId, 'application', args.applicationId);
+      if (application.data.submittedSourceResumeId === args.sourceResumeId && !application.data.submittedResumeVersionId) return application;
+      return updateRecord(ownerId, 'application', application.id, { ...application.data, submittedSourceResumeId: args.sourceResumeId, submittedResumeVersionId: null }, args.expectedVersion);
     }
     case 'get_ai_job': {
       const args = resumeActionSchemas.get_ai_job.parse(input); return publicJob(await reconcileResumeJob(ownerId, await requiredRecord<ResumeJob>(ownerId, 'ai_job', args.id)));
@@ -291,5 +366,88 @@ export async function importLegacyResume(ownerId: string, input: unknown) {
     let version = null;
     if (args.attachGenerated && args.generatedResume) version = await createRecord<ResumeVersion>(ownerId, 'resume_version', { analysisId: id, sourceResumeId: null, sourceText: '', jobDescription: args.jobDescription, analysis: args.analysis as unknown as Analysis, answers: args.answers, generatedResume: args.generatedResume as GeneratedResume, jobId: null, label: 'Imported resume', imported: true }, { id: stableResumeId(ownerId, 'legacy-version-import-v1'), applicationId: application.id });
     return { analysis, version, alreadyImported: false };
+  });
+}
+
+export async function saveSessionBundle(ownerId: string, input: unknown) {
+  const args = SaveSessionBundleSchema.parse(input);
+  return withOwnerTransaction(ownerId, async () => {
+    let source = args.sourceResumeId
+      ? await findResumeRecord<SourceResume>(ownerId, 'source_resume', args.sourceResumeId)
+      : null;
+    if (!source) {
+      const filename = args.sourceFilename || 'session-resume.txt';
+      const mimeType = args.sourceMimeType || 'text/plain';
+      source = await createRecord<SourceResume>(ownerId, 'source_resume', {
+        filename,
+        mimeType,
+        size: Buffer.byteLength(args.sourceText, 'utf8'),
+        storagePath: '',
+        text: args.sourceText,
+      });
+    }
+    const application = await createRecord<ApplicationData>(ownerId, 'application', {
+      company: args.company,
+      role: args.role,
+      stage: 'Saved',
+      jobUrl: args.jobUrl || '',
+      jobDescription: args.jobDescription,
+      location: '',
+      compensation: '',
+      priority: 'medium',
+      tags: [],
+      appliedDate: null,
+      deadline: null,
+      archived: false,
+      submittedResumeVersionId: null,
+      submittedSourceResumeId: args.useCurrentResume && !args.generatedResume ? source.id : null,
+    });
+    const analysis = await createRecord<ResumeAnalysis>(
+      ownerId,
+      'analysis',
+      {
+        sourceResumeId: source.id,
+        sourceText: args.sourceText,
+        jobDescription: args.jobDescription,
+        analysis: args.analysis as unknown as Analysis,
+      },
+      { applicationId: application.id },
+    );
+    const answers = args.answers || {};
+    let draft: StoredRecord<ResumeDraft> | null = null;
+    if (Object.keys(answers).length > 0) {
+      draft = await createRecord<ResumeDraft>(
+        ownerId,
+        'builder_draft',
+        { analysisId: analysis.id, answers },
+        { id: stableResumeId(ownerId, `draft:${analysis.id}`), applicationId: application.id },
+      );
+    }
+    let version: StoredRecord<ResumeVersion> | null = null;
+    if (args.generatedResume) {
+      version = await createRecord<ResumeVersion>(
+        ownerId,
+        'resume_version',
+        {
+          analysisId: analysis.id,
+          sourceResumeId: source.id,
+          sourceText: args.sourceText,
+          jobDescription: args.jobDescription,
+          analysis: args.analysis as unknown as Analysis,
+          answers,
+          generatedResume: args.generatedResume as unknown as GeneratedResume,
+          jobId: null,
+          label: args.label?.trim() || `${args.company}: ${args.role}`,
+        },
+        { applicationId: application.id },
+      );
+    }
+    return {
+      application,
+      sourceResumeId: source.id,
+      analysisId: analysis.id,
+      draftId: draft?.id ?? null,
+      versionId: version?.id ?? null,
+    };
   });
 }

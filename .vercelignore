@@ -4,6 +4,8 @@ playwright-report
 artifacts
 *.log
 .workflow-data
+.data
+.vercel
 .env
 .env.*
 .git

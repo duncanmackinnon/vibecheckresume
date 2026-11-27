@@ -1,25 +1,119 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { ArrowUpRight, Check, Copy, Link2, LockKeyhole, LogOut, Sparkles } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowUpRight, Check, LockKeyhole, LogOut } from 'lucide-react';
 import { useTracker } from './TrackerProvider';
-import { CopyButton, dateLabel, PageHeading, Panel } from './ui';
+import { PageHeading, Panel } from './ui';
 import Link from './TrackerLink';
 import { clearOnboardingSession } from '@/lib/onboarding/session';
 
 export default function Settings() {
-  const {snapshot,refresh}=useTracker();
-  const [origin,setOrigin]=useState('');
-  const [pending,setPending]=useState(false);
-  useEffect(()=>setOrigin(window.location.origin),[]);
-  if(!snapshot)return null;
-  const ready=snapshot.capabilities.auth&&snapshot.capabilities.database;
-  const services=[{name:'Private workspace',ready:snapshot.capabilities.database},{name:'Account sign-in',ready:snapshot.capabilities.auth},{name:'Resume uploads',ready:snapshot.capabilities.storage},{name:'Resume intelligence · DeepSeek',ready:snapshot.capabilities.deepseek},{name:'Workspace assistant · OpenAI',ready:snapshot.capabilities.openai}];
-  async function connection(enabled:boolean){
-    if(snapshot?.demo){toast.info('Sign in to manage your ChatGPT connection.');return;}
-    setPending(true);
-    try{const response=await fetch('/api/tracker/connection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});const data=await response.json();if(!response.ok)throw new Error(typeof data.error==='string'?data.error:data.error?.message||'Could not update the connection.');await refresh();toast.success(enabled?'ChatGPT access enabled. Add the connection in ChatGPT to finish.':'ChatGPT access disconnected.');}catch(error){toast.error(error instanceof Error?error.message:'Could not update connection.');}finally{setPending(false);}
+  const { snapshot } = useTracker();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  if (!snapshot) return null;
+
+  const services = [
+    { name: 'PostgreSQL database', ready: snapshot.capabilities.database },
+    { name: 'Account sign-in', ready: snapshot.capabilities.auth },
+    { name: 'Resume storage', ready: snapshot.capabilities.storage || snapshot.capabilities.database },
+    { name: 'Resume intelligence · DeepSeek', ready: snapshot.capabilities.deepseek },
+  ];
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    clearOnboardingSession();
+    try {
+      if (snapshot?.capabilities.auth0) {
+        router.push('/auth/logout');
+        return;
+      }
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+      router.push('/signin');
+      router.refresh();
+    }
   }
-  return <><PageHeading eyebrow="MAKE YOURSELF AT HOME" title="Your workspace, your way." description="Manage your profile, account, and workspace services."/><div className="vc-settings-grid"><div className="vc-settings-stack"><details id="chatgpt"><summary className="vc-text-link">Optional: use VibeCheck inside ChatGPT</summary><Panel title="Bring your search into ChatGPT" subtitle="Your applications. One more place to make progress." action={<Sparkles size={22} className="vc-muted"/>}><p className="vc-setting-intro">Ask ChatGPT to search the web for jobs, then save the openings you choose with VibeCheck. Your tracker tools can update applications, schedule follow-ups, and show your dashboard inside the conversation.</p><div className="vc-endpoint">{origin ? `${origin}/mcp` : 'Your website address/mcp'}</div><div className="vc-settings-actions"><CopyButton value={`${origin}/mcp`}><Copy size={13}/>Copy connection URL</CopyButton><a className="vc-button vc-secondary" href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">Open ChatGPT Plugins<ArrowUpRight size={13}/></a></div><ol className="vc-setup-steps"><li>Open ChatGPT Plugins and choose Add custom MCP server.</li><li>Enter the connection URL above, choose OAuth authentication, and create it as a plugin.</li><li>Connect your VibeCheck account and approve the requested access. Use the same account you use here.</li><li>Review the tools and select the plugin in a conversation. Try “Find remote roles that fit my experience, then save the ones I choose to VibeCheck.”</li></ol><p className="vc-help-text">Custom MCP plugin availability depends on your ChatGPT account and workspace policy. Your site needs configured sign-in, a database, and a public HTTPS address; localhost cannot be connected from ChatGPT.</p><p className="vc-help-text">No website OpenAI account link or API key is needed for ChatGPT itself. ChatGPT handles its own conversation and web search; VibeCheck tools save and manage your records.</p><div className="vc-settings-status"><Link2 size={16}/><span>{snapshot.demo?'Connect your account to get started':snapshot.connection.enabled?snapshot.connection.lastUsedAt?`Connected · Last used ${dateLabel(snapshot.connection.lastUsedAt,true)}`:ready?'Access enabled · Waiting for your first ChatGPT connection':'Connection requires account sign-in and database setup':'ChatGPT access is disabled'}</span></div>{!snapshot.demo&&<div className="vc-settings-actions" style={{marginTop:16}}><button disabled={pending||!ready} className={`vc-button vc-secondary ${snapshot.connection.enabled?'vc-danger':''}`} onClick={()=>void connection(!snapshot.connection.enabled)}>{pending?'Updating…':snapshot.connection.enabled?'Disconnect ChatGPT':'Enable ChatGPT access'}</button></div>}<p className="vc-help-text">If a connection expires, disconnect it in ChatGPT and link the account again. Re-enable access here first if you previously disconnected.</p></Panel></details><Panel title="Your search preferences"><p className="vc-setting-intro">Your name, resume, and preferred roles shape your job portal.</p><div className="vc-settings-actions"><Link href="/onboarding?edit=preferences" className="vc-button vc-secondary">Edit profile &amp; preferences<ArrowUpRight size={13}/></Link><Link href="/onboarding?edit=resume" className="vc-text-link">Change starting resume</Link></div></Panel><Panel title="Your account" action={<LockKeyhole size={18} className="vc-muted"/>}><dl className="vc-details-list"><div><dt>Workspace</dt><dd>Private · Individual</dd></div><div><dt>Name</dt><dd>{snapshot.user.name}</dd></div><div><dt>Email</dt><dd>{snapshot.demo?'Sign in to connect your account':snapshot.user.email}</dd></div></dl><div className="vc-settings-actions" style={{marginTop:18}}>{snapshot.demo?(snapshot.capabilities.auth?<a href="/auth/login" className="vc-button vc-primary">Sign in<ArrowUpRight size={13}/></a>:<p className="vc-help-text">Account sign-in is not configured on this installation yet.</p>):<a href="/auth/logout" onClick={clearOnboardingSession} className="vc-button vc-secondary"><LogOut size={14}/>Sign out</a>}</div></Panel></div><aside className="vc-settings-stack"><Panel title="Everything in its place" subtitle="The services behind your workspace.">{services.map(service=><div className="vc-status-row" key={service.name}><span>{service.name}</span><span className={service.ready?'is-ready':''}>{service.ready?'Ready':'Needs setup'}</span></div>)}{services.some(service=>!service.ready)&&<p className="vc-help-text">Missing connections need to be configured by the person hosting this workspace. Application tracking works independently of the AI services.</p>}</Panel><section className="vc-assistant-card"><span className="vc-assistant-orb"><Check size={27}/></span><h2>A space that’s<br/><em>just for you.</em></h2><p>Your saved applications, notes, and resumes belong to your account. Use your private workspace to organize your search and keep track of your next steps.</p></section></aside></div></>;
+
+  return (
+    <>
+      <PageHeading
+        eyebrow="MAKE YOURSELF AT HOME"
+        title="Your workspace, your way."
+        description="Manage your profile, account, and workspace services."
+      />
+      <div className="vc-settings-grid">
+        <div className="vc-settings-stack">
+          <Panel title="Your search preferences">
+            <p className="vc-setting-intro">Your name, resume, and preferred roles shape your job portal.</p>
+            <div className="vc-settings-actions">
+              <Link href="/onboarding?edit=preferences" className="vc-button vc-secondary">
+                Edit profile &amp; preferences
+                <ArrowUpRight size={13} />
+              </Link>
+              <Link href="/onboarding?edit=resume" className="vc-text-link">
+                Change starting resume
+              </Link>
+            </div>
+          </Panel>
+
+          <Panel title="Your account" action={<LockKeyhole size={18} className="vc-muted" />}>
+            <dl className="vc-details-list">
+              <div>
+                <dt>Workspace</dt>
+                <dd>Private · Individual</dd>
+              </div>
+              <div>
+                <dt>Name</dt>
+                <dd>{snapshot.user.name}</dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>{snapshot.user.email}</dd>
+              </div>
+            </dl>
+            <div className="vc-settings-actions" style={{ marginTop: 18 }}>
+              <button type="button" onClick={() => void signOut()} disabled={signingOut} className="vc-button vc-secondary">
+                <LogOut size={14} />
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </button>
+            </div>
+          </Panel>
+        </div>
+
+        <aside className="vc-settings-stack">
+          <Panel title="Everything in its place" subtitle="The services behind your workspace.">
+            {services.map((service) => (
+              <div className="vc-status-row" key={service.name}>
+                <span>{service.name}</span>
+                <span className={service.ready ? 'is-ready' : ''}>{service.ready ? 'Ready' : 'Needs setup'}</span>
+              </div>
+            ))}
+            {services.some((service) => !service.ready) && (
+              <p className="vc-help-text">
+                Missing connections need to be configured in deployment environment variables. Application tracking works independently.
+              </p>
+            )}
+          </Panel>
+
+          <section className="vc-assistant-card">
+            <span className="vc-assistant-orb">
+              <Check size={27} />
+            </span>
+            <h2>
+              A space that’s
+              <br />
+              <em>just for you.</em>
+            </h2>
+            <p>
+              Your saved applications, fit analyses, and tailored resumes belong strictly to your account in PostgreSQL.
+            </p>
+          </section>
+        </aside>
+      </div>
+    </>
+  );
 }

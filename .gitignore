@@ -65,3 +65,5 @@ firebase-debug.log*
 /test-results/
 /playwright/.auth/
 /artifacts/
+
+/.data/

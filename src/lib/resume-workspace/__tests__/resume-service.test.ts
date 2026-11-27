@@ -1,8 +1,8 @@
 /** @jest-environment node */
 import type { StoredRecord } from '@/lib/tracker/types';
 import type { Analysis, GeneratedResume } from '@/app/types';
-import { completeResumeUpload, executeResumeAction, importLegacyResume, prepareResumeUpload, reconcileResumeJob, resumeDownloadLink, stableResumeId } from '../service';
-import { createHash } from 'node:crypto';
+import { completeResumeUpload, executeResumeAction, importLegacyResume, prepareResumeUpload, reconcileResumeJob, resumeDownloadLink, saveSessionBundle, stableResumeId } from '../service';
+import { createHash, randomUUID } from 'node:crypto';
 import { persistResumeResult } from '../persistence';
 import { validateUpload } from '../validation';
 import type { ResumeJob } from '../types';
@@ -26,8 +26,8 @@ jest.mock('@/lib/tracker/store', () => ({
     return structuredClone(record);
   }),
   listRecords: jest.fn(async (ownerId: string, kind: string) => [...mockRecords.values()].filter(record => record.ownerId === ownerId && record.kind === kind).map(record => structuredClone(record))),
-  createRecord: jest.fn(async (ownerId: string, kind: string, data: unknown, options: { id: string; applicationId?: string }) => {
-    const record = { id: options.id, ownerId, kind, applicationId: options.applicationId || null, data: structuredClone(data), version: 1, createdAt: '2026-09-13T12:00:00Z', updatedAt: '2026-09-13T12:00:00Z' } as StoredRecord<unknown>;
+  createRecord: jest.fn(async (ownerId: string, kind: string, data: unknown, options: { id?: string; applicationId?: string } = {}) => {
+    const record = { id: options.id || randomUUID(), ownerId, kind, applicationId: options.applicationId || null, data: structuredClone(data), version: 1, createdAt: '2026-09-13T12:00:00Z', updatedAt: '2026-09-13T12:00:00Z' } as StoredRecord<unknown>;
     if (mockRecords.has(record.id)) throw new Error('Duplicate record');
     mockRecords.set(record.id, record); return structuredClone(record);
   }),
@@ -75,6 +75,22 @@ beforeEach(() => {
 
 test('owned resume reads reject another account', async () => {
   await expect(executeResumeAction(outsider, 'get_resume', { id: analysisId, kind: 'analysis' })).rejects.toMatchObject({ status: 404 });
+});
+
+test('formatted uploads retain their original and reopen after an idempotent preview save', async () => {
+  const sourceId = '50000000-0000-4000-8000-000000000001';
+  const original = { filename: 'resume.txt', mimeType: 'text/plain', size: 20, storagePath: '', text: 'Original resume text', fileBase64: 'b3JpZ2luYWw=' };
+  seed(sourceId, 'source_resume', original, null);
+  const input = { id: sourceId, generatedResume: generated };
+  await expect(executeResumeAction(outsider, 'save_source_preview', input)).rejects.toMatchObject({ status: 404 });
+  await executeResumeAction(owner, 'save_source_preview', input);
+  await executeResumeAction(owner, 'save_source_preview', input);
+  expect(mockRecords.get(sourceId)).toMatchObject({ version: 2, data: { ...original, generatedResume: generated } });
+  await expect(executeResumeAction(owner, 'list_resumes', {})).resolves.toMatchObject({
+    sources: [expect.objectContaining({ id: sourceId, data: expect.objectContaining({ hasPreview: true }) })],
+  });
+  await expect(executeResumeAction(owner, 'get_resume', { id: sourceId, kind: 'source_resume' })).resolves.toMatchObject({ data: { generatedResume: generated } });
+  await expect(executeResumeAction(owner, 'save_source_preview', { id: sourceId, generatedResume: { latex: 'invalid' } })).rejects.toThrow();
 });
 
 test('generation cannot attach an analysis from a different application', async () => {
@@ -175,6 +191,53 @@ test('retrying an old job consumes today’s quota, even when the job was create
     if (previousLimit === undefined) delete process.env.RESUME_AI_DAILY_LIMIT; else process.env.RESUME_AI_DAILY_LIMIT = previousLimit;
     if (previousKey === undefined) delete process.env.DEEPSEEK_API_KEY; else process.env.DEEPSEEK_API_KEY = previousKey;
   }
+});
+
+test('select_current_resume keeps source resume, clears version, is idempotent, and enforces ownership', async () => {
+  const sourceId = '50000000-0000-4000-8000-000000000002';
+  const versionId = '60000000-0000-4000-8000-000000000001';
+  seed(sourceId, 'source_resume', { filename: 'original.pdf', mimeType: 'application/pdf', size: 100, storagePath: '', text: 'Original PDF content' }, null);
+  seed(versionId, 'resume_version', { analysisId, sourceResumeId: sourceId, sourceText: '', jobDescription: 'JD', analysis, answers, generatedResume: generated, jobId: null, label: 'V1' });
+
+  const afterVersion = await executeResumeAction(owner, 'select_submitted_resume', { applicationId: appId, versionId, expectedVersion: 1 }) as StoredRecord<{ submittedResumeVersionId: string | null; submittedSourceResumeId?: string | null }>;
+  expect(afterVersion.data.submittedResumeVersionId).toBe(versionId);
+  expect(afterVersion.data.submittedSourceResumeId).toBeNull();
+
+  const afterCurrent = await executeResumeAction(owner, 'select_current_resume', { applicationId: appId, sourceResumeId: sourceId, expectedVersion: afterVersion.version }) as StoredRecord<{ submittedResumeVersionId: string | null; submittedSourceResumeId?: string | null }>;
+  expect(afterCurrent.data.submittedSourceResumeId).toBe(sourceId);
+  expect(afterCurrent.data.submittedResumeVersionId).toBeNull();
+
+  const idempotentCall = await executeResumeAction(owner, 'select_current_resume', { applicationId: appId, sourceResumeId: sourceId, expectedVersion: afterCurrent.version }) as StoredRecord<{ submittedSourceResumeId?: string | null }>;
+  expect(idempotentCall.version).toBe(afterCurrent.version);
+
+  const switchedBack = await executeResumeAction(owner, 'select_submitted_resume', { applicationId: appId, versionId, expectedVersion: afterCurrent.version }) as StoredRecord<{ submittedResumeVersionId: string | null; submittedSourceResumeId?: string | null }>;
+  expect(switchedBack.data.submittedResumeVersionId).toBe(versionId);
+  expect(switchedBack.data.submittedSourceResumeId).toBeNull();
+
+  await expect(executeResumeAction(outsider, 'select_current_resume', { applicationId: appId, sourceResumeId: sourceId, expectedVersion: 1 })).rejects.toMatchObject({ status: 404 });
+});
+
+test('saveSessionBundle with useCurrentResume marks submittedSourceResumeId without creating a generated version or builder origin', async () => {
+  const saved = await saveSessionBundle(owner, {
+    company: 'Northstar',
+    role: 'Staff Engineer',
+    jobDescription: 'Lead TypeScript and PostgreSQL architecture across customer apps.',
+    sourceFilename: 'my-current-resume.pdf',
+    sourceMimeType: 'application/pdf',
+    sourceText: 'Jordan Lee\nExperienced TypeScript and PostgreSQL architect.',
+    analysis: analysis as unknown as Record<string, unknown>,
+    answers,
+    generatedResume: null,
+    useCurrentResume: true,
+  });
+
+  const savedSource = mockRecords.get(saved.sourceResumeId)?.data as { origin?: string; filename: string };
+  expect(savedSource.filename).toBe('my-current-resume.pdf');
+  expect(savedSource.origin).toBeUndefined();
+  expect(saved.versionId).toBeNull();
+  const savedApp = mockRecords.get(saved.application.id)?.data as { submittedSourceResumeId?: string | null; submittedResumeVersionId?: string | null };
+  expect(savedApp.submittedSourceResumeId).toBe(saved.sourceResumeId);
+  expect(savedApp.submittedResumeVersionId).toBeNull();
 });
 
 test.each(['0', '-5', 'not-a-number', '1000001'])('invalid quota configuration %s falls back to a bounded positive limit', async limit => {

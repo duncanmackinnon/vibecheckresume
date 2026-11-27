@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createDemoSnapshot } from '../../src/lib/tracker/demo';
+import { createWorkspaceFixtureSnapshot } from './fixtures';
 import type { Application, TrackerEntry } from '../../src/lib/tracker/types';
 import type { ResumeWorkspaceData } from '../../src/lib/resume-workspace/types';
 
@@ -9,7 +9,7 @@ test.beforeEach(()=>test.skip(!process.env.PLAYWRIGHT_AUTH_STATE,'Set PLAYWRIGHT
 // These browser fixtures exercise the live UI contract, not an authentication bypass.
 // Real authentication, ownership and persistence are exercised by service/API tests.
 test('authenticated UI creates, edits, reloads and follows application deep links', async ({ page }) => {
-  const state = createDemoSnapshot();
+  const state = createWorkspaceFixtureSnapshot();
   state.demo = false;
   state.user = { ...state.user, name: 'Test Applicant', email: 'applicant@example.test' };
   state.applications = [];
@@ -85,7 +85,7 @@ test('authenticated UI creates, edits, reloads and follows application deep link
 });
 
 test('a conflicting edit reloads the current record and explains what happened', async ({ page }) => {
-  const state = createDemoSnapshot();
+  const state = createWorkspaceFixtureSnapshot();
   state.demo = false;
   state.applications = [state.applications[0]];
   const app = state.applications[0];
@@ -107,7 +107,7 @@ test('a conflicting edit reloads the current record and explains what happened',
 });
 
 test('printing a selected resume hides the studio, version controls and tracker', async ({ page }) => {
-  const state = createDemoSnapshot();
+  const state = createWorkspaceFixtureSnapshot();
   state.demo = false;
   const application = state.applications[0];
   const resumes: ResumeWorkspaceData = { sources: [], analyses: [], drafts: [], jobs: [], versions: [{
@@ -133,7 +133,7 @@ test('printing a selected resume hides the studio, version controls and tracker'
 });
 
 test('saved notes can be edited and reopened after a reload', async ({ page }) => {
-  const state = createDemoSnapshot();
+  const state = createWorkspaceFixtureSnapshot();
   state.demo = false;
   const application = state.applications[0];
   const note = state.entries.find(entry => entry.applicationId === application.id && entry.kind === 'note')!;

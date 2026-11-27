@@ -20,7 +20,7 @@ let db: PGlite;
 before(async () => {
   Object.assign(process.env, {NODE_ENV:'test', DATABASE_URL:'test-only'});
   db = new PGlite();
-  for (const file of ['0000_tracker.sql', '0001_onboarding_discovery.sql','0002_accounts_persistence.sql']) await db.exec(await readFile(new URL(`../drizzle/${file}`, import.meta.url), 'utf8'));
+  for (const file of ['0000_tracker.sql', '0001_onboarding_discovery.sql','0002_accounts_persistence.sql','0003_auth_credentials.sql']) await db.exec(await readFile(new URL(`../drizzle/${file}`, import.meta.url), 'utf8'));
   await db.exec('SET ROLE vibecheck_app');
   let queue = Promise.resolve();
   setPoolForTests({connect: async () => {

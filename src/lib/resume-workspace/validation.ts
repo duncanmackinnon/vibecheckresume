@@ -48,3 +48,19 @@ export function validateUpload(file: File): 'application/pdf' | 'text/plain' {
   if (extension === 'txt' && (!file.type || file.type === 'text/plain')) return 'text/plain';
   throw new Error('Unsupported resume file. Upload a PDF or TXT file.');
 }
+
+export const SaveSessionBundleSchema = z.object({
+  company: z.string().trim().min(1, 'Company name is required.').max(160),
+  role: z.string().trim().min(1, 'Role title is required.').max(160),
+  jobUrl: z.string().trim().max(500).optional(),
+  jobDescription: z.string().trim().min(20, 'Job description must be at least 20 characters.').max(40000),
+  sourceResumeId: z.string().uuid().optional().nullable(),
+  sourceFilename: z.string().trim().min(1).max(200).optional(),
+  sourceMimeType: z.enum(['application/pdf', 'text/plain']).optional(),
+  sourceText: z.string().trim().min(20, 'Resume text must be at least 20 characters.').max(80000),
+  analysis: z.record(z.string(), z.unknown()),
+  answers: z.record(z.string(), z.string()).optional(),
+  generatedResume: z.record(z.string(), z.unknown()).optional().nullable(),
+  useCurrentResume: z.boolean().optional(),
+  label: z.string().trim().max(160).optional(),
+});

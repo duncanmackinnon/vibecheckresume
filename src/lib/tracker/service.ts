@@ -38,7 +38,7 @@ export async function executeAction(ownerId:string,action:string,input:unknown,i
   const parsed=schema.parse(input) as Record<string,any>;
   return idempotent(ownerId,idempotencyKey,action,parsed,async()=>{
     if(action==='create_application') {
-      const result=await createRecord<ApplicationData>(ownerId,'application',{...parsed,archived:false,submittedResumeVersionId:null} as ApplicationData);
+      const result=await createRecord<ApplicationData>(ownerId,'application',{...parsed,archived:false,submittedResumeVersionId:null,submittedSourceResumeId:null} as ApplicationData);
       await activity(ownerId,result.id,'Application added');
       return flatten(result);
     }

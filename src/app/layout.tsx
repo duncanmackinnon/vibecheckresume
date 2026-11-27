@@ -2,8 +2,8 @@ import './globals.css';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata = {
-  title: 'VibeCheck — Your next chapter',
-  description: 'A thoughtful home for your job search. Track applications, prepare resumes, and keep moving forward.',
+  title: 'VibeCheck: Resume builder and job portal',
+  description: 'Build or tailor your resume, then create an account to save applications, track tasks, and discover matching roles.',
 };
 
 export default function RootLayout({

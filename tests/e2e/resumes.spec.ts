@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { createDemoSnapshot } from '../../src/lib/tracker/demo';
+import { createWorkspaceFixtureSnapshot } from './fixtures';
 import type { Analysis, GeneratedResume } from '../../src/app/types';
 import type { RecordKind, StoredRecord } from '../../src/lib/tracker/types';
 import type { ResumeWorkspaceData } from '../../src/lib/resume-workspace/types';
@@ -9,7 +9,7 @@ import type { ResumeWorkspaceData } from '../../src/lib/resume-workspace/types';
 test.beforeEach(()=>test.skip(!process.env.PLAYWRIGHT_AUTH_STATE,'Set PLAYWRIGHT_AUTH_STATE to an authenticated browser storage state.'));
 
 function resumeFixture() {
-  const snapshot = createDemoSnapshot();
+  const snapshot = createWorkspaceFixtureSnapshot();
   snapshot.demo = false; snapshot.applications = [snapshot.applications[0]]; snapshot.entries = [];
   snapshot.capabilities = { database: true, auth: true, storage: true, deepseek: true, openai: true };
   const app = snapshot.applications[0];
@@ -121,6 +121,45 @@ for (const operation of ['analyze_resume', 'generate_resume'] as const) {
     await expect(page.getByText(operation === 'analyze_resume' ? 'Analysis started. Your work will be saved automatically.' : 'Resume generation started. You can leave this page.', { exact: true })).toHaveCount(0);
   });
 }
+
+test('keep current resume selects the source resume inside an application', async ({ page }) => {
+  const fixture = resumeFixture();
+  const actions: Array<{ action: string; input: Record<string, unknown> }> = [];
+  await mountFixture(page, fixture, async route => {
+    const { action, input } = route.request().postDataJSON();
+    actions.push({ action, input });
+    if (action === 'select_current_resume') {
+      fixture.snapshot.applications[0] = {
+        ...fixture.app,
+        submittedSourceResumeId: String(input.sourceResumeId),
+        submittedResumeVersionId: null,
+        version: 2,
+      };
+      await route.fulfill({ json: { ...fixture.record('application', fixture.app.id, fixture.snapshot.applications[0]), version: 2 } });
+    } else {
+      await route.fulfill({ status: 400, json: { error: `Unexpected action ${action}` } });
+    }
+  });
+
+  await openStudio(page, fixture.app.id);
+  await page.getByRole('button', { name: 'Keep current resume', exact: true }).click();
+  await expect(page.getByText('Using your current resume: alice-original.txt')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Download original', exact: true })).toHaveAttribute(
+    'href',
+    `/api/resumes/${fixture.data.sources[0].id}?download=1`,
+  );
+  await expect(page.getByRole('button', { name: 'Using current resume', exact: true }).first()).toBeDisabled();
+  expect(actions).toEqual([
+    {
+      action: 'select_current_resume',
+      input: {
+        applicationId: fixture.app.id,
+        sourceResumeId: fixture.data.sources[0].id,
+        expectedVersion: 1,
+      },
+    },
+  ]);
+});
 
 test('legacy session import requires an application and explicit confirmation and attaches no generated resume by default', async ({ page }) => {
   const fixture = resumeFixture(); let imports = 0;

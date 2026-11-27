@@ -74,17 +74,17 @@ export default function ResumePreview({ generatedResume }: ResumePreviewProps) {
           <div className="mt-5 space-y-5">
             {preview.sections.map((section, sectionIndex) => (
               <section key={`${section.title}-${sectionIndex}`}>
-                <h3 className="border-b border-slate-300 pb-1 text-sm font-bold uppercase tracking-normal text-slate-900">
+                {section.title && <h3 className="border-b border-slate-300 pb-1 text-sm font-bold uppercase tracking-normal text-slate-900">
                   {section.title}
-                </h3>
+                </h3>}
                 <div className="mt-3 space-y-3">
                   {section.items.map((item, itemIndex) => (
                     <div key={`${item.heading}-${itemIndex}`}>
                       <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
                         <div>
-                          <h4 className="text-sm font-bold text-slate-950">{item.heading}</h4>
+                          {item.heading && <h4 className="text-sm font-bold text-slate-950">{item.heading}</h4>}
                           {(item.subheading || item.meta) && (
-                            <p className="text-xs italic leading-5 text-slate-600">
+                            <p className={item.heading ? 'text-xs italic leading-5 text-slate-600' : 'text-sm leading-6 text-slate-700'}>
                               {[item.subheading, item.meta].filter(Boolean).join(' | ')}
                             </p>
                           )}

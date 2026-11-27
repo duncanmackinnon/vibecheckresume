@@ -1,6 +1,6 @@
 import { requireUser } from '@/lib/tracker/auth';
 import { assertSameOrigin, jsonError, readJson } from '@/lib/tracker/http';
-import { executeResumeAction, importLegacyResume, listResumeSummaries, listResumeWorkspace, resumeActionSchemas, uploadResume, type ResumeAction } from '@/lib/resume-workspace/service';
+import { executeResumeAction, importLegacyResume, listResumeSummaries, listResumeWorkspace, resumeActionSchemas, saveSessionBundle, uploadResume, type ResumeAction } from '@/lib/resume-workspace/service';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -28,11 +28,12 @@ export async function POST(request: Request) {
       const file = form.get('resume');
       if (!(file instanceof File)) return Response.json({ error: 'Choose a PDF or TXT resume.' }, { status: 400 });
       const record = await uploadResume(user.id, file, String(form.get('idempotencyKey') || ''));
-      return Response.json({ ...record, data: { ...record.data, text: '', storagePath: '' } }, { status: 201 });
+      return Response.json({ ...record, data: { ...record.data, text: '', storagePath: '', fileBase64: undefined } }, { status: 201 });
     }
     const body = await readJson(request);
     if (!body || typeof body !== 'object' || typeof body.action !== 'string') return Response.json({ error: 'Choose a resume action.' }, { status: 400 });
     if (body.action === 'import_legacy') return Response.json(await importLegacyResume(user.id, body.input));
+    if (body.action === 'save_session_bundle') return Response.json(await saveSessionBundle(user.id, body.input), { status: 201, headers: { 'Cache-Control': 'no-store' } });
     if (!Object.hasOwn(resumeActionSchemas, body.action)) return Response.json({ error: 'Unknown resume action.' }, { status: 400 });
     const result = await executeResumeAction(user.id, body.action as ResumeAction, body.input);
     return Response.json(result, { status: ['analyze_resume', 'generate_resume', 'retry_ai_job'].includes(body.action) ? 202 : 200 });

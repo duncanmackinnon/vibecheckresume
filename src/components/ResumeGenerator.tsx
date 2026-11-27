@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Analysis, ResumeGenerationAnswers } from '@/app/types';
 import {
@@ -12,15 +12,47 @@ import {
 interface ResumeGeneratorProps {
   analysis: Analysis;
   jobDescription?: string;
+  answers?: ResumeGenerationAnswers;
+  onAnswersChange?: (next: ResumeGenerationAnswers) => void;
+  onGenerate?: (answers: ResumeGenerationAnswers) => Promise<void> | void;
+  isGenerating?: boolean;
+  error?: string;
+  generateLabel?: string;
+  generatingLabel?: string;
+  disabledGenerate?: boolean;
+  disabledInputs?: boolean;
+  secondaryAction?: ReactNode;
+  statusNote?: ReactNode;
+  nextStepText?: string;
 }
 
-export default function ResumeGenerator({ analysis, jobDescription = '' }: ResumeGeneratorProps) {
-  const [answers, setAnswers] = useState<ResumeGenerationAnswers>(() =>
+export default function ResumeGenerator({
+  analysis,
+  jobDescription = '',
+  answers: controlledAnswers,
+  onAnswersChange,
+  onGenerate,
+  isGenerating: controlledIsGenerating,
+  error: controlledError,
+  generateLabel = 'Generate Resume Preview',
+  generatingLabel = 'Generating...',
+  disabledGenerate = false,
+  disabledInputs = false,
+  secondaryAction,
+  statusNote,
+  nextStepText,
+}: ResumeGeneratorProps) {
+  const [internalAnswers, setInternalAnswers] = useState<ResumeGenerationAnswers>(() =>
     createInitialResumeGenerationAnswers(analysis, jobDescription)
   );
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState('');
+  const [internalIsGenerating, setInternalIsGenerating] = useState(false);
+  const [internalError, setInternalError] = useState('');
   const router = useRouter();
+
+  const answers = controlledAnswers ?? internalAnswers;
+  const isGenerating = Boolean(controlledIsGenerating ?? internalIsGenerating);
+  const fieldsDisabled = isGenerating || disabledInputs;
+  const error = controlledError ?? internalError;
 
   const targetedQuestions = useMemo(
     () => getResumeGenerationQuestions(analysis, jobDescription)
@@ -37,16 +69,28 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
   const profile = analysis.resumeBuilderProfile;
 
   const updateAnswer = (id: string, value: string) => {
-    setAnswers((current) => ({ ...current, [id]: value }));
-    setError('');
+    const next = { ...answers, [id]: value };
+    if (onAnswersChange) {
+      onAnswersChange(next);
+    } else {
+      setInternalAnswers(next);
+    }
+    if (controlledError === undefined) {
+      setInternalError('');
+    }
   };
 
   const handleGenerate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!requiredAnswered || isGenerating) return;
+    if (!requiredAnswered || isGenerating || disabledGenerate) return;
 
-    setIsGenerating(true);
-    setError('');
+    if (onGenerate) {
+      await onGenerate(answers);
+      return;
+    }
+
+    setInternalIsGenerating(true);
+    setInternalError('');
 
     try {
       const response = await fetch('/api/generate-resume', {
@@ -80,9 +124,9 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
 
       router.push('/resume-preview');
     } catch (generationError) {
-      setError(generationError instanceof Error ? generationError.message : 'Failed to generate resume');
+      setInternalError(generationError instanceof Error ? generationError.message : 'Failed to generate resume');
     } finally {
-      setIsGenerating(false);
+      setInternalIsGenerating(false);
     }
   };
 
@@ -134,7 +178,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
                   value={answers.fullName ?? ''}
                   placeholder="Jane Doe"
                   onChange={(event) => updateAnswer('fullName', event.target.value)}
-                  disabled={isGenerating}
+                  disabled={fieldsDisabled}
                 />
               </label>
 
@@ -148,7 +192,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
                   value={answers.targetTitle ?? ''}
                   placeholder="Frontend Engineer"
                   onChange={(event) => updateAnswer('targetTitle', event.target.value)}
-                  disabled={isGenerating}
+                  disabled={fieldsDisabled}
                 />
               </label>
 
@@ -162,7 +206,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
                   value={answers.contactDetails ?? ''}
                   placeholder="jane@example.com | 555-123-4567 | linkedin.com/in/jane | github.com/jane"
                   onChange={(event) => updateAnswer('contactDetails', event.target.value)}
-                  disabled={isGenerating}
+                  disabled={fieldsDisabled}
                 />
               </label>
             </div>
@@ -199,7 +243,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
                     value={answers[question.id] ?? ''}
                     placeholder={question.placeholder}
                     onChange={(event) => updateAnswer(question.id, event.target.value)}
-                    disabled={isGenerating}
+                    disabled={fieldsDisabled}
                   />
                 ) : (
                   <input
@@ -207,7 +251,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
                     value={answers[question.id] ?? ''}
                     placeholder={question.placeholder}
                     onChange={(event) => updateAnswer(question.id, event.target.value)}
-                    disabled={isGenerating}
+                    disabled={fieldsDisabled}
                   />
                 )}
               </label>
@@ -226,13 +270,21 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={!requiredAnswered || isGenerating}
-            className="clay-button inline-flex w-full items-center justify-center px-4 py-3 text-sm font-bold text-white"
-          >
-            {isGenerating ? 'Generating...' : 'Generate Resume Preview'}
-          </button>
+          <div className={secondaryAction || statusNote ? 'flex flex-wrap items-center gap-3' : undefined}>
+            {secondaryAction}
+            <button
+              type="submit"
+              disabled={!requiredAnswered || isGenerating || disabledGenerate}
+              className={
+                secondaryAction || statusNote
+                  ? 'clay-button inline-flex items-center justify-center px-5 py-3 text-sm font-bold text-white'
+                  : 'clay-button inline-flex w-full items-center justify-center px-4 py-3 text-sm font-bold text-white'
+              }
+            >
+              {isGenerating ? generatingLabel : generateLabel}
+            </button>
+            {statusNote && <div className="text-xs text-slate-600">{statusNote}</div>}
+          </div>
         </form>
 
         <aside className="space-y-4">
@@ -272,7 +324,7 @@ export default function ResumeGenerator({ analysis, jobDescription = '' }: Resum
           <div className="clay-panel-muted p-4">
             <h3 className="text-sm font-semibold text-slate-900">Next Step</h3>
             <p className="mt-2 text-xs leading-5 text-slate-600">
-              After generation, the resume opens on a dedicated preview page with export actions and the underlying LaTeX available for review.
+              {nextStepText ?? 'After generation, the resume opens on a dedicated preview page with export actions and the underlying LaTeX available for review.'}
             </p>
           </div>
         </aside>

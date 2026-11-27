@@ -28,7 +28,7 @@ export const profileInputSchema = draftProfileSchema.extend({displayName:z.strin
 export const onboardingRequestSchema = z.discriminatedUnion('action', [
   z.object({action: z.literal('save_draft'), input: z.object({
     profile: draftProfileSchema.extend({completedAt:z.string().datetime().nullable()}),
-    screen: z.enum(['name','choose','upload','build','preferences','connect','cadence','finish']),
+    screen: z.enum(['name','choose','upload','build','target','report','builder','result','preferences','connect','cadence','finish']),
     answers: unfinishedAnswersSchema, builtResume: z.boolean(), builderStep:z.number().int().min(0).max(5).default(0),
   }).strict(), expectedVersion: z.number().int().positive().optional(), idempotencyKey: z.string().uuid()}).strict(),
   z.object({action: z.literal('save_profile'), input: profileInputSchema, expectedVersion: z.number().int().positive().optional(), idempotencyKey: z.string().uuid()}).strict(),

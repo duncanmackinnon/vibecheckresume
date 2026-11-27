@@ -15,6 +15,7 @@ type ChatMessage = {
 };
 
 export interface ResumeGenerationInput {
+  sourceText?: string;
   analysis: Analysis;
   jobDescription?: string;
   answers: ResumeGenerationAnswers;
@@ -129,7 +130,7 @@ function normalizePreviewItem(value: unknown): GeneratedResumePreviewItem | null
   const details = toPreviewList(
     readProperty(value, 'details') ?? readProperty(value, 'bullets') ?? readProperty(value, 'highlights'),
     6,
-    320
+    360
   );
 
   if (!heading && details.length === 0) return null;
@@ -212,7 +213,7 @@ function normalizeGeneratedResumePreview(value: unknown, latex: string): Generat
     fullName: fullName || createFallbackPreview(latex).fullName,
     contact: toPreviewList(readProperty(value, 'contact') ?? readProperty(value, 'contactDetails'), 8, 120),
     headline: toPreviewText(readProperty(value, 'headline') ?? readProperty(value, 'targetTitle'), 160) || undefined,
-    summary: toPreviewText(readProperty(value, 'summary'), 420) || undefined,
+    summary: toPreviewText(readProperty(value, 'summary'), 500) || undefined,
     sections: Array.isArray(sectionsValue)
       ? sectionsValue
           .map(normalizePreviewSection)
@@ -485,7 +486,7 @@ Rules:
 - Use ASCII punctuation and escape LaTeX special characters in content: &, %, $, #, _, {, }, ~, ^, and backslash.
 - Do not invent employers, job titles, dates, degrees, links, metrics, credentials, or projects.
 - If a fact is missing, omit it or list a concise question in followUpQuestions.
-- Optimize for one-page resume density: concise heading, 2-4 bullets per role or project, and role-relevant technical skills.
+- Optimize for concise ATS-friendly resume density (targeting one page when reasonable): crisp heading, 2-4 high-impact bullets per role or project, and role-relevant grouped technical skills. Preserve real employers, job titles, dates, education, and credentials without inventing or merging distinct roles.
 - Rewrite bullets to emphasize action, technical scope, and measurable outcome when evidence supports it.
 - Prioritize roleRequirements, priorityActions, matched skills, and missing skills from the prior analysis.
 - Use resumeBuilderProfile for heading/contact/profile details when present, unless the user answers override them.
@@ -541,6 +542,9 @@ ${JSON.stringify(input.answers, null, 2)}
 
 Resume evidence from previous analysis:
 ${trimForPrompt(JSON.stringify(buildEvidenceSnapshot(input.analysis), null, 2), 22000)}
+
+Original resume (authoritative source; preserve facts and chronology):
+${input.sourceText ? trimForPrompt(input.sourceText, 10000) : 'Use the supplied evidence and answers.'}
 
 Job description:
 ${trimForPrompt(input.jobDescription ?? '', 14000)}

@@ -19,6 +19,7 @@ interface AnalysisResultProps {
   isChunked?: boolean;
   onNewAnalysis?: () => void;
   embedded?: boolean;
+  mode?: 'ai' | 'deterministic';
 }
 
 const markdownComponents = {
@@ -57,6 +58,7 @@ export default function AnalysisResult({
   priorityActions,
   onNewAnalysis,
   embedded = false,
+  mode,
 }: AnalysisResultProps) {
   const router = useRouter();
   const scoreColor = matchScore >= 80 ? 'green' : matchScore >= 60 ? 'yellow' : 'red';
@@ -72,9 +74,13 @@ export default function AnalysisResult({
         <div className="clay-panel p-6 sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr,280px] lg:items-center">
             <div>
-              <p className="clay-kicker text-xs font-bold uppercase">AI Resume Match</p>
+              <p className="clay-kicker text-xs font-bold uppercase">
+                {mode === 'deterministic' ? 'Resume Fit' : 'AI Resume Match'}
+              </p>
               <h2 className="mt-2 text-3xl font-black text-slate-950">Detailed Fit Report</h2>
-              <p className="mt-1 text-sm text-slate-600">Objective scoring + AI narrative</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {mode === 'deterministic' ? 'Keyword and requirement evidence from your resume' : 'Objective scoring + AI narrative'}
+              </p>
             </div>
             <div className="flex items-center justify-start gap-4 sm:justify-end">
               <div className="clay-inset flex h-28 w-28 items-center justify-center rounded-full">

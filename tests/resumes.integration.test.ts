@@ -132,10 +132,19 @@ test('superseded attempts and invalid outputs cannot create partial or duplicate
 
 test('submitted resume selection is retry-safe and rejects cross-user or cross-application versions', async () => {
   const application = await getRecord(alice.id, 'application', firstApp.id);
-  const selected = await executeResumeAction(alice.id, 'select_submitted_resume', { applicationId: firstApp.id, versionId: generatedVersion.id, expectedVersion: application.version }) as StoredRecord<{ submittedResumeVersionId: string }>;
+  const selected = await executeResumeAction(alice.id, 'select_submitted_resume', { applicationId: firstApp.id, versionId: generatedVersion.id, expectedVersion: application.version }) as StoredRecord<{ submittedResumeVersionId: string | null; submittedSourceResumeId?: string | null }>;
   const repeated = await executeResumeAction(alice.id, 'select_submitted_resume', { applicationId: firstApp.id, versionId: generatedVersion.id, expectedVersion: application.version });
   assert.deepEqual(selected, repeated);
   assert.equal(selected.data.submittedResumeVersionId, generatedVersion.id);
+  assert.equal(selected.data.submittedSourceResumeId, null);
+
+  const currentSelected = await executeResumeAction(alice.id, 'select_current_resume', { applicationId: firstApp.id, sourceResumeId: source.id, expectedVersion: selected.version }) as StoredRecord<{ submittedResumeVersionId: string | null; submittedSourceResumeId?: string | null }>;
+  assert.equal(currentSelected.data.submittedSourceResumeId, source.id);
+  assert.equal(currentSelected.data.submittedResumeVersionId, null);
+  const currentRepeated = await executeResumeAction(alice.id, 'select_current_resume', { applicationId: firstApp.id, sourceResumeId: source.id, expectedVersion: currentSelected.version });
+  assert.deepEqual(currentSelected, currentRepeated);
+  await assert.rejects(executeResumeAction(bob.id, 'select_current_resume', { applicationId: bobApp.id, sourceResumeId: source.id, expectedVersion: 1 }), { status: 404 });
+
   await assert.rejects(executeResumeAction(alice.id, 'select_submitted_resume', { applicationId: secondApp.id, versionId: generatedVersion.id, expectedVersion: 1 }), { status: 404 });
   await assert.rejects(executeResumeAction(bob.id, 'select_submitted_resume', { applicationId: bobApp.id, versionId: generatedVersion.id, expectedVersion: 1 }), { status: 404 });
   await assert.rejects(executeResumeAction(bob.id, 'get_ai_job', { id: generationJob.id }), { status: 404 });

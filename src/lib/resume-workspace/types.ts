@@ -6,11 +6,13 @@ export interface SourceResume {
   mimeType: 'application/pdf' | 'text/plain';
   size: number;
   storagePath: string;
+  fileBase64?: string;
   text: string;
   sha256?: string;
   origin?: 'builder';
   starterAnswers?: import('@/lib/onboarding/starter-resume').StarterResumeAnswers;
   generatedResume?: GeneratedResume;
+  hasPreview?: boolean;
 }
 
 export interface ResumeAnalysis {
@@ -69,7 +71,7 @@ export interface ResumeWorkspaceData {
 
 export interface ResumeWorkspaceSummaryData {
   summariesOnly: true;
-  sources: StoredRecord<Pick<SourceResume, 'filename' | 'mimeType' | 'size' | 'origin'>>[];
+  sources: StoredRecord<Pick<SourceResume, 'filename' | 'mimeType' | 'size' | 'origin' | 'hasPreview'>>[];
   analyses: StoredRecord<{ sourceResumeId: string | null; score: number }>[];
   drafts: StoredRecord<Pick<ResumeDraft, 'analysisId'>>[];
   versions: StoredRecord<{ analysisId: string; sourceResumeId: string | null; label: string; fullName: string; headline?: string }>[];

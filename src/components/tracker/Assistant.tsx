@@ -1,6 +1,22 @@
 'use client';
-import Link from './TrackerLink';
+
 import AssistantPanel from '@/components/assistant/AssistantPanel';
-import {useTracker} from './TrackerProvider';
-import {EmptyState,PageHeading,Panel} from './ui';
-export default function Assistant(){const {snapshot,refresh}=useTracker();if(!snapshot)return null;return <><PageHeading eyebrow="THINK IT THROUGH, TOGETHER" title="A little help with your next move." description="Find an application, organize your next steps, or put your thoughts into words."/>{snapshot.demo?<Panel><EmptyState title="Your search has a sounding board." description="The website assistant is available in a signed-in workspace with AI configured. Explore your applications and saved resumes to get started."><Link href="/applications" className="vc-button vc-primary">Explore applications</Link><Link href="/settings" className="vc-button vc-secondary">Workspace settings</Link></EmptyState><div className="vc-pipeline-legend" style={{padding:'0 15px 20px',gridTemplateColumns:'1fr 1fr'}}>{['What needs my attention this week?','Help me prepare for my next interview.','Draft a thoughtful follow-up message.','Find my saved remote roles.'].map(prompt=><p className="vc-help-text" key={prompt}>“{prompt}”</p>)}</div></Panel>:<AssistantPanel onChange={()=>void refresh()}/>}</>;}
+import { useTracker } from './TrackerProvider';
+import { PageHeading } from './ui';
+import NextSteps from './NextSteps';
+
+export default function Assistant() {
+  const { snapshot, refresh } = useTracker();
+  if (!snapshot) return null;
+  if (!snapshot.capabilities.openai) return <NextSteps />;
+  return (
+    <>
+      <PageHeading
+        eyebrow="THINK IT THROUGH, TOGETHER"
+        title="A little help with your next move."
+        description="Find an application, organize your next steps, or put your thoughts into words."
+      />
+      <AssistantPanel onChange={() => void refresh()} />
+    </>
+  );
+}

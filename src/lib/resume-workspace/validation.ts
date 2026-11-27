@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { createInitialResumeGenerationAnswers, getResumeGenerationQuestions } from '@/app/lib/resumeGeneratorQuestions';
 import type { Analysis, ResumeGenerationAnswers } from '@/app/types';
+import { SUPPORTED_RESUME_MIMES, validateUpload, type SupportedResumeMimeType } from '@/lib/resume-parser/formats';
+
+export { SUPPORTED_RESUME_MIMES, validateUpload, type SupportedResumeMimeType };
 
 export const resumeIdSchema = z.string().uuid();
 export const answersSchema = z.record(z.string().max(100), z.string().max(12000)).refine(value => Object.keys(value).length <= 50, 'Too many answers');
@@ -41,14 +44,6 @@ export function completeAnswers(analysis: Analysis, jobDescription: string, inpu
   return { answers, questions, missing: required.filter(question => !answers[question.id]?.trim()) };
 }
 
-export function validateUpload(file: File): 'application/pdf' | 'text/plain' {
-  if (!file.size || file.size > 8 * 1024 * 1024) throw new Error('Upload a nonempty PDF or TXT resume up to 8 MB.');
-  const extension = file.name.toLowerCase().split('.').pop();
-  if (extension === 'pdf' && (!file.type || file.type === 'application/pdf')) return 'application/pdf';
-  if (extension === 'txt' && (!file.type || file.type === 'text/plain')) return 'text/plain';
-  throw new Error('Unsupported resume file. Upload a PDF or TXT file.');
-}
-
 export const SaveSessionBundleSchema = z.object({
   company: z.string().trim().min(1, 'Company name is required.').max(160),
   role: z.string().trim().min(1, 'Role title is required.').max(160),
@@ -56,7 +51,7 @@ export const SaveSessionBundleSchema = z.object({
   jobDescription: z.string().trim().min(20, 'Job description must be at least 20 characters.').max(40000),
   sourceResumeId: z.string().uuid().optional().nullable(),
   sourceFilename: z.string().trim().min(1).max(200).optional(),
-  sourceMimeType: z.enum(['application/pdf', 'text/plain']).optional(),
+  sourceMimeType: z.enum(SUPPORTED_RESUME_MIMES).optional(),
   sourceText: z.string().trim().min(20, 'Resume text must be at least 20 characters.').max(80000),
   analysis: z.record(z.string(), z.unknown()),
   answers: z.record(z.string(), z.string()).optional(),

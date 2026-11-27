@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/tracker/auth';
 import { jsonError } from '@/lib/tracker/http';
+import { extensionForMimeType } from '@/lib/resume-parser/formats';
 import { resumeDownloadLink, executeResumeAction } from '@/lib/resume-workspace/service';
 import { getRecord } from '@/lib/tracker/store';
 import type { SourceResumeData } from '@/lib/tracker/types';
@@ -15,7 +16,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (url.searchParams.get('download') === '1') {
       const source = await getRecord<SourceResumeData>(user.id, 'source_resume', resumeIdSchema.parse(id));
       if (!source.data.storagePath) {
-        const ext = source.data.mimeType === 'application/pdf' ? 'pdf' : 'txt';
+        const ext = extensionForMimeType(source.data.mimeType, source.data.filename);
         const body = source.data.fileBase64 ? Buffer.from(source.data.fileBase64, 'base64') : source.data.text;
         const contentType = source.data.fileBase64 ? source.data.mimeType : 'text/plain; charset=utf-8';
         return new Response(body, {

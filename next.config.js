@@ -2,7 +2,8 @@ const { withWorkflow } = require('workflow/next');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode:true, output:'standalone', poweredByHeader:false, outputFileTracingRoot:__dirname,
-  serverExternalPackages:['pg','pdfjs-dist','@electric-sql/pglite'],
+  serverExternalPackages:['pg','pdfjs-dist','@electric-sql/pglite','mammoth'],
+  transpilePackages:['compromise','efrt','suffix-thumb'],
   outputFileTracingIncludes:{
     '/api/resumes':['./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'],
     '/api/resumes/session':['./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'],

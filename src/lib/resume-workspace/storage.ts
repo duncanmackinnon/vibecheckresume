@@ -1,6 +1,17 @@
+import type { ResumeBuilderProfile } from '@/app/types';
+import { toResumeBuilderProfile } from '@/lib/resume-parser';
+import { parseResumeFile } from '@/lib/resume-parser/server';
+import type { ParsedResumeDocument, RoleSuggestion, SupportedResumeMimeType } from '@/lib/resume-parser';
 import { createClient } from '@supabase/supabase-js';
-import { extractPdfText } from '@/app/lib/pdfUtils';
-import { validateUpload } from './validation';
+
+export interface ReadUploadResult {
+  mimeType: SupportedResumeMimeType;
+  bytes: ArrayBuffer;
+  text: string;
+  parsedResume: ParsedResumeDocument;
+  profile: ResumeBuilderProfile | undefined;
+  suggestedRoles: RoleSuggestion;
+}
 
 export function privateResumeStorage() {
   const url = process.env.SUPABASE_URL;
@@ -10,14 +21,14 @@ export function privateResumeStorage() {
     .storage.from(process.env.SUPABASE_RESUME_BUCKET || 'resumes');
 }
 
-export async function readUpload(file: File) {
-  const mimeType = validateUpload(file);
-  const bytes = await file.arrayBuffer();
-  if (mimeType === 'application/pdf' && new TextDecoder().decode(bytes.slice(0, 5)) !== '%PDF-') {
-    throw new Error('This file does not contain a valid PDF.');
-  }
-  const text = (mimeType === 'application/pdf' ? await extractPdfText(file) : new TextDecoder('utf-8', { fatal: true }).decode(bytes)).replace(/\0/g, '').trim();
-  if (text.length < 25) throw new Error('The resume has too little readable text. Use a text-based PDF or TXT resume.');
-  if (text.length > 250000) throw new Error('The resume text is too long. Upload a shorter resume.');
-  return { mimeType, bytes, text };
+export async function readUpload(file: File): Promise<ReadUploadResult> {
+  const { mimeType, bytes, text, parsedResume } = await parseResumeFile(file);
+  return {
+    mimeType,
+    bytes,
+    text,
+    parsedResume,
+    profile: toResumeBuilderProfile(parsedResume),
+    suggestedRoles: parsedResume.suggestedRoles,
+  };
 }

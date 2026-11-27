@@ -9,8 +9,9 @@ import { getApplication } from '@/lib/tracker/service';
 import { createRecord, getRecord, idempotent, listRecords, updateRecord, withOwnerTransaction } from '@/lib/tracker/store';
 import type { ApplicationData, RecordKind, StoredRecord } from '@/lib/tracker/types';
 import { persistResumeResult } from './persistence';
+import { extensionForMimeType } from '@/lib/resume-parser/formats';
 import type { ResumeAnalysis, ResumeDraft, ResumeJob, ResumeVersion, ResumeWorkspaceData, ResumeWorkspaceSummaryData, SourceResume } from './types';
-import { analysisSchema, answersSchema, completeAnswers, generatedResumeSchema, resumeIdSchema, SaveSessionBundleSchema, validateUpload } from './validation';
+import { analysisSchema, answersSchema, completeAnswers, generatedResumeSchema, resumeIdSchema, SaveSessionBundleSchema, SUPPORTED_RESUME_MIMES, validateUpload } from './validation';
 import { privateResumeStorage, readUpload } from './storage';
 
 const key = z.string().uuid();
@@ -59,7 +60,7 @@ export async function listResumeWorkspace(ownerId: string, applicationId?: strin
   const related = <T>(records: StoredRecord<T>[]) => records.filter(record => !applicationId || record.applicationId === applicationId);
   // File bytes are private; extracted resume text is returned only for an explicit owned-record read.
   const reconciledJobs = await Promise.all(related(jobs).map(job => reconcileResumeJob(ownerId, job)));
-  return { sources: sources.map(record => ({ ...record, data: { ...record.data, hasPreview: Boolean(record.data.generatedResume), text: '', storagePath: '', fileBase64: undefined, starterAnswers: undefined, generatedResume: undefined } })), analyses: related(analyses), drafts: related(drafts), versions: related(versions), jobs: reconciledJobs.map(publicJob) };
+  return { sources: sources.map(record => ({ ...record, data: { ...record.data, hasPreview: Boolean(record.data.generatedResume), text: '', storagePath: '', fileBase64: undefined, parsedResume: undefined, starterAnswers: undefined, generatedResume: undefined } })), analyses: related(analyses), drafts: related(drafts), versions: related(versions), jobs: reconciledJobs.map(publicJob) };
 }
 
 export function publicJob(job: StoredRecord<ResumeJob>): StoredRecord<ResumeJob> {
@@ -95,15 +96,16 @@ export async function reconcileResumeJob(ownerId: string, job: StoredRecord<Resu
   });
 }
 
-export const resumeUploadSchema = z.object({ filename: z.string().min(1).max(180), mimeType: z.enum(['application/pdf', 'text/plain']), size: z.number().int().min(1).max(8 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/), idempotencyKey: key });
+export const resumeUploadSchema = z.object({ filename: z.string().min(1).max(180), mimeType: z.enum(SUPPORTED_RESUME_MIMES), size: z.number().int().min(1).max(8 * 1024 * 1024), sha256: z.string().regex(/^[a-f0-9]{64}$/), idempotencyKey: key });
 type ResumeUploadInput = z.infer<typeof resumeUploadSchema>;
 
 async function uploadIntent(ownerId: string, input: unknown) {
   const args = resumeUploadSchema.parse(input);
   try { validateUpload({ name: args.filename, type: args.mimeType, size: args.size } as File); }
-  catch (error) { throw new ResumeError(error instanceof Error ? error.message : 'Choose a PDF or TXT resume.'); }
+  catch (error) { throw new ResumeError(error instanceof Error ? error.message : 'Choose a supported resume file.'); }
   const id = stableResumeId(ownerId, `upload:${args.idempotencyKey}`);
-  return idempotent(ownerId, `resume-upload:${args.idempotencyKey}`, 'prepare_resume_upload', args, async () => ({ ...args, id, storagePath: `${ownerId}/${id}.${args.mimeType === 'application/pdf' ? 'pdf' : 'txt'}` }));
+  const ext = extensionForMimeType(args.mimeType, args.filename);
+  return idempotent(ownerId, `resume-upload:${args.idempotencyKey}`, 'prepare_resume_upload', args, async () => ({ ...args, id, storagePath: `${ownerId}/${id}.${ext}` }));
 }
 
 /** Only a path-limited upload token reaches the browser; the service credential stays here. */
@@ -125,13 +127,13 @@ export async function completeResumeUpload(ownerId: string, input: unknown) {
   if (file.size !== intent.size || file.size > 8 * 1024 * 1024) throw new ResumeError('The uploaded file does not match the selected resume. Start a new upload.', 409);
   const bytes = await file.arrayBuffer();
   if (createHash('sha256').update(Buffer.from(bytes)).digest('hex') !== intent.sha256) throw new ResumeError('The uploaded file contents do not match the selected resume. Start a new upload.', 409);
-  const { text } = await readUpload(new File([bytes], intent.filename, { type: intent.mimeType })).catch(error => { throw new ResumeError(error instanceof Error ? error.message : 'The resume could not be read.'); });
-  return createRecord<SourceResume>(ownerId, 'source_resume', { filename: intent.filename, mimeType: intent.mimeType, size: intent.size, storagePath: intent.storagePath, text, sha256: intent.sha256 }, { id: intent.id });
+  const { text, parsedResume } = await readUpload(new File([bytes], intent.filename, { type: intent.mimeType })).catch(error => { throw new ResumeError(error instanceof Error ? error.message : 'The resume could not be read.'); });
+  return createRecord<SourceResume>(ownerId, 'source_resume', { filename: intent.filename, mimeType: intent.mimeType, size: intent.size, storagePath: intent.storagePath, text, sha256: intent.sha256, ...(parsedResume ? { parsedResume } : {}) }, { id: intent.id });
 }
 
 /** Server-side convenience used by import and PostgreSQL direct uploads; hosted deployments may also use signed Supabase URLs. */
 export async function uploadResume(ownerId: string, file: File, idempotencyKey: string) {
-  const { mimeType, bytes, text } = await readUpload(file);
+  const { mimeType, bytes, text, parsedResume } = await readUpload(file);
   const sha256 = createHash('sha256').update(Buffer.from(bytes)).digest('hex');
   const input: ResumeUploadInput = { filename: file.name, mimeType, size: file.size, sha256, idempotencyKey };
   const intent = await uploadIntent(ownerId, input);
@@ -141,7 +143,7 @@ export async function uploadResume(ownerId: string, file: File, idempotencyKey: 
     return createRecord<SourceResume>(
       ownerId,
       'source_resume',
-      { filename: file.name, mimeType, size: file.size, storagePath: '', fileBase64: Buffer.from(bytes).toString('base64'), text, sha256 },
+      { filename: file.name, mimeType, size: file.size, storagePath: '', fileBase64: Buffer.from(bytes).toString('base64'), text, sha256, ...(parsedResume ? { parsedResume } : {}) },
       { id: intent.id },
     );
   }

@@ -254,3 +254,38 @@ test('upload -> tailor path follows the old Fit Report -> Resume Builder -> Prev
   expect(screen.getByText('jordan-cv.txt')).toBeVisible();
   expect(screen.getByText('84% fit recorded')).toBeVisible();
 });
+
+test('keeps "GitHub | LinkedIn | Portfolio" out of "Roles you are looking for" and suggests the actual experience role', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      authenticated: false,
+      profile: null,
+      connection: null,
+      capabilities: { auth: true, auth0: false, database: true, storage: false, deepseek: false, openai: false },
+    }),
+  });
+
+  render(<Page />);
+  await screen.findByRole('link', { name: 'Sign in' });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Your name' }), { target: { value: 'Jordan' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  fireEvent.click(screen.getByRole('button', { name: /Upload my resume/ }));
+
+  const resumeText = [
+    'Jordan Lee',
+    'jordan@example.test | Toronto, ON',
+    'GitHub | LinkedIn | Portfolio',
+    '',
+    'Experience',
+    'Senior Full-Stack Engineer | Acme Corp | 2022 - Present',
+    '- Built distributed TypeScript services.',
+  ].join('\n');
+  const file = new File([resumeText], 'jordan-cv.txt', { type: 'text/plain' });
+  Object.defineProperty(file, 'text', { value: async () => resumeText });
+  fireEvent.change(screen.getByLabelText('Resume file'), { target: { files: [file] } });
+  fireEvent.click(screen.getByRole('button', { name: 'Keep my current resume' }));
+
+  const rolesInput = await screen.findByLabelText('Roles you are looking for');
+  expect(rolesInput).toHaveValue('Senior Full-Stack Engineer');
+});

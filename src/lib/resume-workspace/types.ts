@@ -1,15 +1,17 @@
 import type { Analysis, GeneratedResume, ResumeGenerationAnswers } from '@/app/types';
+import type { ParsedResumeDocument, SupportedResumeMimeType } from '@/lib/resume-parser';
 import type { StoredRecord } from '@/lib/tracker/types';
 
 export interface SourceResume {
   filename: string;
-  mimeType: 'application/pdf' | 'text/plain';
+  mimeType: SupportedResumeMimeType;
   size: number;
   storagePath: string;
   fileBase64?: string;
   text: string;
   sha256?: string;
   origin?: 'builder';
+  parsedResume?: ParsedResumeDocument;
   starterAnswers?: import('@/lib/onboarding/starter-resume').StarterResumeAnswers;
   generatedResume?: GeneratedResume;
   hasPreview?: boolean;

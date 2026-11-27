@@ -2,7 +2,7 @@
 
 A private job-search workspace with guided onboarding, sourced job discovery, an application board, tasks and interviews, saved resumes, and optional website AI. The core workflow is save a job, tailor a resume, and track the next step.
 
-The tracker uses Next.js 16 / React 19, Auth0, Supabase PostgreSQL and private Storage. DeepSeek handles resume AI; the optional website assistant and job discovery use a server-owned OpenAI API key with separate API billing. Users do not link ChatGPT subscriptions. See the [hosted product scope and alternative methods](docs/HOSTED_PRODUCT_PLAN.md). The supported [ChatGPT MCP plugin](docs/CHATGPT_MCP_SETUP.md) is an optional advanced connection, outside the core launch requirements.
+The tracker uses Next.js 16 / React 19, first-party PostgreSQL authentication (`scrypt` + signed session cookies) alongside optional Auth0 OIDC, Supabase PostgreSQL (or embedded PGlite) and private Storage. DeepSeek handles resume AI; the optional website assistant and job discovery use a server-owned OpenAI API key with separate API billing. Users do not link ChatGPT subscriptions. See the [full system architecture](docs/ARCHITECTURE.md) and [hosted product scope and alternative methods](docs/HOSTED_PRODUCT_PLAN.md). The supported [ChatGPT MCP plugin](docs/CHATGPT_MCP_SETUP.md) is an optional advanced connection, outside the core launch requirements.
 
 ## Run locally
 
@@ -18,7 +18,8 @@ See the [verification record](docs/VERIFICATION.md) for the deployed preview, te
 - Optional on-demand website job discovery with cited results, and duplicate-safe saving to Applications. Daily and weekly searches require explicit opt-in and remain outside the core launch scope.
 - Searchable board and table with fixed stages, priorities, tags, archive and restore.
 - Application details, contacts, notes, activity, dated follow-ups, and interviews with retained timezones.
-- Reusable private source resumes, application-specific analyses, saved builder answers, immutable generated versions and submitted-version selection.
+- Multi-format layout- and local-NLP-aware resume ingestion (`.pdf`, `.docx`, `.rtf`, `.md`, `.tex`, `.txt`, and pasted text) recovering PDF hyperlinks, 2-column reading order, and confidence-gated target role suggestions.
+- Reusable private source resumes, application-specific analyses, saved builder answers, immutable generated versions, and "Keep current resume" vs. submitted-version selection.
 - Resume preview, browser print/PDF and LaTeX export. Old builder links lead to an explicit one-time import with application confirmation.
 - Saved website assistant conversations and validated tracker tools. An optional MCP plugin shares those tools with ChatGPT. Tools cannot send messages or submit applications.
 - Ownership checks plus PostgreSQL row policies, version conflict checks, retry-safe mutations, private signed file transfers and per-user AI limits.

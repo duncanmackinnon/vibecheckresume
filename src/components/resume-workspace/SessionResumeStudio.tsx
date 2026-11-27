@@ -8,6 +8,17 @@ import { toast } from 'sonner';
 import type { Analysis, GeneratedResume, ResumeGenerationAnswers } from '@/app/types';
 import { createInitialResumeGenerationAnswers } from '@/app/lib/resumeGeneratorQuestions';
 import {
+  formatOriginalBadge,
+  inferResumeMimeType,
+  isBinaryResumeMimeType,
+  parseClientResumeTextByFormat,
+  parseTextResume,
+  RESUME_FILE_ACCEPT,
+  RESUME_FORMAT_SUMMARY,
+  validateUpload,
+  type ParsedResumeDocument,
+} from '@/lib/resume-parser';
+import {
   readSessionSourceResume,
   writeSessionSourceResume,
   type SessionSourceResume,
@@ -134,16 +145,22 @@ export default function SessionResumeStudio({
     setBusy('extract');
     setError('');
     try {
+      const resolvedMime = validateUpload(file);
       let nextSource: SessionSourceResume;
-      if (file.type === 'text/plain' || /\.txt$/i.test(file.name)) {
-        const text = (await file.text()).replace(/\0/g, '').trim();
-        if (text.length < 25) throw new Error('The resume has too little readable text. Upload at least 25 characters.');
+      if (!isBinaryResumeMimeType(resolvedMime)) {
+        const rawText = (await file.text()).replace(/\0/g, '').trim();
+        const parsedDoc = parseClientResumeTextByFormat(rawText, resolvedMime);
+        const canonical = parsedDoc.canonicalText.trim();
+        if (canonical.length < 25) throw new Error('The resume has too little readable text. Upload at least 25 characters.');
         nextSource = {
           schemaVersion: 1,
           filename: file.name,
-          mimeType: 'text/plain',
+          mimeType: resolvedMime,
           origin: 'upload',
-          text,
+          text: canonical,
+          ...(rawText !== canonical && rawText.length <= 500_000 ? { rawText } : {}),
+          parsedResume: parsedDoc,
+          suggestedRoles: parsedDoc.suggestedRoles,
           updatedAt: new Date().toISOString(),
         };
       } else {
@@ -151,20 +168,25 @@ export default function SessionResumeStudio({
         form.append('file', file);
         const res = await fetch('/api/resumes/session', { method: 'POST', body: form });
         const payload = await res.json();
-        if (!res.ok) throw new Error(payload.error || 'Could not extract text from PDF resume.');
+        if (!res.ok) throw new Error(payload.error || 'Could not extract text from that resume file.');
         const pendingPdfBase64 = file.size <= 2_500_000 ? await fileToBase64(file).catch(() => '') : '';
         nextSource = {
           schemaVersion: 1,
           filename: String(payload.filename || file.name),
-          mimeType: 'application/pdf',
+          mimeType: inferResumeMimeType(String(payload.filename || file.name), payload.mimeType || resolvedMime),
           origin: 'upload',
           text: String(payload.text || ''),
           ...(pendingPdfBase64 ? { pendingPdfBase64 } : {}),
+          ...(payload.parsedResume ? { parsedResume: payload.parsedResume as ParsedResumeDocument } : {}),
+          ...(payload.suggestedRoles ? { suggestedRoles: payload.suggestedRoles } : {}),
           updatedAt: new Date().toISOString(),
         };
       }
       writeSessionSourceResume(nextSource);
       setSource(nextSource);
+      if (nextSource.suggestedRoles && nextSource.suggestedRoles.confidence >= 0.65 && nextSource.suggestedRoles.primaryRole) {
+        setRoleTitle((prev) => prev || nextSource.suggestedRoles!.primaryRole!);
+      }
       setUploadedFile(file);
       setSelectedSourceResumeId(null);
       setShowPaste(false);
@@ -187,12 +209,14 @@ export default function SessionResumeStudio({
       if (!res.ok || !payload.data?.text) {
         throw new Error(payload.error || 'Could not load that saved resume.');
       }
+      const filename = String(payload.data.filename || 'saved-resume.txt');
       const nextSource: SessionSourceResume = {
         schemaVersion: 1,
-        filename: String(payload.data.filename || 'saved-resume.txt'),
-        mimeType: payload.data.mimeType === 'application/pdf' ? 'application/pdf' : 'text/plain',
+        filename,
+        mimeType: inferResumeMimeType(filename, String(payload.data.mimeType || '')),
         origin: payload.data.origin === 'builder' ? 'builder' : 'upload',
         text: String(payload.data.text),
+        ...(payload.data.parsedResume ? { parsedResume: payload.data.parsedResume as ParsedResumeDocument } : {}),
         updatedAt: String(payload.updatedAt || new Date().toISOString()),
       };
       setSource(nextSource);
@@ -228,7 +252,7 @@ export default function SessionResumeStudio({
 
     if (existingSource?.pendingPdfBase64 && !existingSource.text && !extractingPending.current) {
       extractingPending.current = true;
-      const file = base64ToFile(existingSource.pendingPdfBase64, existingSource.filename, 'application/pdf');
+      const file = base64ToFile(existingSource.pendingPdfBase64, existingSource.filename, existingSource.mimeType || 'application/pdf');
       void extractUploadedFile(file);
     }
   }, [scopeKey, defaultJobDescription, extractUploadedFile]);
@@ -259,16 +283,22 @@ export default function SessionResumeStudio({
       setError('Paste at least 25 characters of resume text.');
       return;
     }
+    const parsedDoc = parseTextResume(text);
     const nextSource: SessionSourceResume = {
       schemaVersion: 1,
       filename: 'pasted-resume.txt',
       mimeType: 'text/plain',
       origin: 'upload',
       text,
+      parsedResume: parsedDoc,
+      suggestedRoles: parsedDoc.suggestedRoles,
       updatedAt: new Date().toISOString(),
     };
     writeSessionSourceResume(nextSource);
     setSource(nextSource);
+    if (parsedDoc.suggestedRoles.confidence >= 0.65 && parsedDoc.suggestedRoles.primaryRole) {
+      setRoleTitle((prev) => prev || parsedDoc.suggestedRoles.primaryRole!);
+    }
     setUploadedFile(null);
     setSelectedSourceResumeId(null);
     setShowPaste(false);
@@ -278,7 +308,7 @@ export default function SessionResumeStudio({
 
   function keepCurrentResume() {
     if (!source?.text || source.text.trim().length < 25) {
-      setError('Upload a PDF or TXT resume, paste your resume text, or select a saved resume first.');
+      setError(`Upload a ${RESUME_FORMAT_SUMMARY} resume, paste your resume text, or select a saved resume first.`);
       return;
     }
     setError('');
@@ -290,7 +320,7 @@ export default function SessionResumeStudio({
 
   async function runAnalyze() {
     if (!source?.text || source.text.trim().length < 25) {
-      setError('Upload a PDF or TXT resume, paste your resume text, or select a saved resume first.');
+      setError(`Upload a ${RESUME_FORMAT_SUMMARY} resume, paste your resume text, or select a saved resume first.`);
       return;
     }
     if (jobDescription.trim().length < 25) {
@@ -373,11 +403,14 @@ export default function SessionResumeStudio({
       let targetFile = uploadedFile;
       if (!targetFile) {
         if (source.pendingPdfBase64) {
-          targetFile = base64ToFile(source.pendingPdfBase64, source.filename, 'application/pdf');
+          targetFile = base64ToFile(source.pendingPdfBase64, source.filename, source.mimeType || 'application/pdf');
         } else {
-          targetFile = new File([source.text], source.filename.replace(/\.pdf$/i, '.txt') || 'resume.txt', {
-            type: 'text/plain',
-          });
+          const binaryFallback = isBinaryResumeMimeType(source.mimeType);
+          targetFile = new File(
+            [source.rawText ?? source.text],
+            binaryFallback ? source.filename.replace(/\.(?:pdf|docx)$/i, '.txt') || 'resume.txt' : source.filename,
+            { type: binaryFallback ? 'text/plain' : source.mimeType || 'text/plain' },
+          );
         }
       }
       const form = new FormData();
@@ -603,7 +636,7 @@ export default function SessionResumeStudio({
                 onClick={() => fileRef.current?.click()}
               >
                 <Upload size={15} aria-hidden="true" />
-                {busy === 'extract' ? 'Reading file…' : source ? 'Replace resume (PDF/TXT)' : 'Upload PDF or TXT'}
+                {busy === 'extract' ? 'Reading file…' : source ? 'Replace resume' : 'Upload resume'}
               </button>
               <button
                 type="button"
@@ -621,7 +654,7 @@ export default function SessionResumeStudio({
                 ref={fileRef}
                 aria-label="Session resume file"
                 type="file"
-                accept=".pdf,.txt,application/pdf,text/plain"
+                accept={RESUME_FILE_ACCEPT}
                 className="sr-only"
                 disabled={Boolean(busy)}
                 onChange={(event) => {
@@ -692,7 +725,7 @@ export default function SessionResumeStudio({
             </div>
           ) : (
             <p className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white/60 px-4 py-3 text-sm text-slate-600">
-              Upload a PDF or TXT resume, pick a saved library resume, or paste your resume text above to begin.
+              Upload a {RESUME_FORMAT_SUMMARY} resume, pick a saved library resume, or paste your resume text above to begin.
             </p>
           )}
 
@@ -1027,7 +1060,7 @@ export default function SessionResumeStudio({
                 <div>
                   <h3 className="text-base font-bold text-slate-900">{source.filename}</h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    {source.mimeType === 'application/pdf' ? 'PDF original' : 'Plain text original'} ·{' '}
+                    {formatOriginalBadge(source.mimeType, source.filename)} ·{' '}
                     {source.text.length.toLocaleString()} characters ready
                     {analysis ? ` · ${analysis.score}% fit score recorded` : ''}
                   </p>

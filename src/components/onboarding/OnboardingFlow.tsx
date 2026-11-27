@@ -21,6 +21,19 @@ import {
 import type { Analysis, GeneratedResume, ResumeGenerationAnswers } from '@/app/types';
 import { createInitialResumeGenerationAnswers } from '@/app/lib/resumeGeneratorQuestions';
 import { extractResumeBuilderProfileFromText } from '@/app/lib/resumeBuilderProfile';
+import {
+  formatOriginalBadge,
+  inferResumeMimeType,
+  isBinaryResumeMimeType,
+  parseClientResumeTextByFormat,
+  parseTextResume,
+  RESUME_FILE_ACCEPT,
+  RESUME_FORMAT_SUMMARY,
+  toResumeBuilderProfile,
+  validateUpload,
+  type ParsedResumeDocument,
+} from '@/lib/resume-parser';
+import { normalizeRoleTitle } from '@/lib/resume-parser/roleInference';
 import type { Capabilities, ConnectionData } from '@/lib/tracker/types';
 import type { OnboardingDraftData, OnboardingProfileData, SavedOnboardingDraft, SavedOnboardingProfile } from '@/lib/onboarding/types';
 import {
@@ -158,9 +171,13 @@ export default function OnboardingFlow() {
     if (storedSource) setSessionSource(storedSource);
     if (storedResult) {
       setWizardResult(storedResult);
-      setPortalRoles((prev) => prev || storedResult.targetRole || storedResult.analysis?.resumeBuilderProfile?.headline || '');
+      const safeHeadlineRole = storedResult.analysis?.resumeBuilderProfile?.headline
+        ? normalizeRoleTitle(storedResult.analysis.resumeBuilderProfile.headline)
+        : '';
+      const safeTargetRole = storedResult.targetRole ? normalizeRoleTitle(storedResult.targetRole) || storedResult.targetRole : '';
+      setPortalRoles((prev) => prev || safeTargetRole || safeHeadlineRole);
       setPortalCompany((prev) => prev || storedResult.company);
-      setPortalRoleTitle((prev) => prev || storedResult.targetRole);
+      setPortalRoleTitle((prev) => prev || safeTargetRole);
     }
     if (session && !session.ownerId) {
       setDraft(session);
@@ -474,7 +491,7 @@ export default function OnboardingFlow() {
 
     const input = {
       filename: targetFile.name,
-      mimeType: targetFile.type || (targetFile.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain'),
+      mimeType: inferResumeMimeType(targetFile.name, targetFile.type),
       size: targetFile.size,
       sha256,
       idempotencyKey,
@@ -519,7 +536,7 @@ export default function OnboardingFlow() {
       return stored;
     }
     if (stored?.pendingPdfBase64) {
-      const pdfFile = base64ToFile(stored.pendingPdfBase64, stored.filename, 'application/pdf');
+      const pdfFile = base64ToFile(stored.pendingPdfBase64, stored.filename, stored.mimeType || 'application/pdf');
       const form = new FormData();
       form.append('file', pdfFile);
       const res = await fetch('/api/resumes/session', { method: 'POST', body: form });
@@ -527,7 +544,10 @@ export default function OnboardingFlow() {
       if (res.ok && String(payload.text || '').trim().length >= 25) {
         const next: SessionSourceResume = {
           ...stored,
+          mimeType: inferResumeMimeType(stored.filename, payload.mimeType || stored.mimeType),
           text: String(payload.text).replace(/\0/g, '').trim(),
+          ...(payload.parsedResume ? { parsedResume: payload.parsedResume as ParsedResumeDocument } : {}),
+          ...(payload.suggestedRoles ? { suggestedRoles: payload.suggestedRoles } : {}),
           updatedAt: new Date().toISOString(),
         };
         writeSessionSourceResume(next);
@@ -539,12 +559,14 @@ export default function OnboardingFlow() {
       const res = await fetch(`/api/resumes/${encodeURIComponent(draft.profile.sourceResumeId)}?kind=source_resume`, { cache: 'no-store' });
       const record = await res.json().catch(() => ({}));
       if (res.ok && record.data?.text) {
+        const filename = String(record.data.filename || 'saved-resume.txt');
         const next: SessionSourceResume = {
           schemaVersion: 1,
-          filename: String(record.data.filename || 'saved-resume.txt'),
-          mimeType: record.data.mimeType === 'application/pdf' ? 'application/pdf' : 'text/plain',
+          filename,
+          mimeType: inferResumeMimeType(filename, String(record.data.mimeType || '')),
           origin: record.data.origin === 'builder' ? 'builder' : 'upload',
           text: String(record.data.text),
+          ...(record.data.parsedResume ? { parsedResume: record.data.parsedResume as ParsedResumeDocument } : {}),
           updatedAt: String(record.updatedAt || new Date().toISOString()),
         };
         writeSessionSourceResume(next);
@@ -572,14 +594,15 @@ export default function OnboardingFlow() {
     return null;
   }
 
-  function applyExtractedProfileHints(sourceText: string) {
-    if (!sourceText || sourceText.trim().length < 25) return undefined;
-    const extracted = extractResumeBuilderProfileFromText(sourceText);
+  function applyExtractedProfileHints(sourceText: string, parsedDoc?: ParsedResumeDocument) {
+    if (!parsedDoc && (!sourceText || sourceText.trim().length < 25)) return undefined;
+    const doc = parsedDoc ?? parseTextResume(sourceText);
+    const extracted = toResumeBuilderProfile(doc) ?? extractResumeBuilderProfileFromText(sourceText);
     if (extracted?.email) setAuthEmail((prev) => prev || extracted.email!);
     if (extracted?.location) setPortalLocation((prev) => prev || extracted.location!);
-    const suggested = extracted?.headline || extracted?.skills?.slice(0, 3).join(', ') || '';
+    const suggested = doc.suggestedRoles.confidence >= 0.65 ? doc.suggestedRoles.formatted : '';
     if (suggested) setPortalRoles((prev) => prev || suggested);
-    return extracted;
+    return { extracted, suggestedRoles: doc.suggestedRoles };
   }
 
   async function continueUpload(destination: 'keep' | 'tailor') {
@@ -588,8 +611,8 @@ export default function OnboardingFlow() {
     if (!file && !hasPaste && !sessionSource?.text && !draft.profile.sourceResumeId) {
       setError(
         showPaste
-          ? 'Paste at least 25 characters of resume text, or choose a PDF or TXT file.'
-          : 'Upload a PDF or TXT resume, or paste your resume text to continue.',
+          ? 'Paste at least 25 characters of resume text, or choose a supported resume file.'
+          : `Upload a ${RESUME_FORMAT_SUMMARY} resume, or paste your resume text to continue.`,
       );
       return;
     }
@@ -603,40 +626,47 @@ export default function OnboardingFlow() {
       let clearedSourceResumeId = false;
 
       if (file) {
-        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-        if (isPdf) {
+        const resolvedMime = inferResumeMimeType(file.name, file.type);
+        if (isBinaryResumeMimeType(resolvedMime)) {
           const form = new FormData();
           form.append('file', file);
           const res = await fetch('/api/resumes/session', { method: 'POST', body: form });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok) {
-            throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not extract text from that PDF resume.');
+            throw new Error(typeof payload.error === 'string' ? payload.error : 'Could not extract text from that resume file.');
           }
           const extracted = String(payload.text || '').replace(/\0/g, '').trim();
           if (extracted.length < 25) {
-            throw new Error('The resume has too little readable text. Use a text-based PDF, a TXT file, or paste your text.');
+            throw new Error('The resume has too little readable text. Use a text-based PDF, DOCX, or text resume.');
           }
           const pendingPdfBase64 = file.size <= 2_500_000 ? await fileToBase64(file).catch(() => '') : '';
           currentSource = {
             schemaVersion: 1,
             filename: String(payload.filename || file.name),
-            mimeType: 'application/pdf',
+            mimeType: inferResumeMimeType(String(payload.filename || file.name), payload.mimeType || resolvedMime),
             origin: 'upload',
             text: extracted,
             ...(pendingPdfBase64 ? { pendingPdfBase64 } : {}),
+            ...(payload.parsedResume ? { parsedResume: payload.parsedResume as ParsedResumeDocument } : {}),
+            ...(payload.suggestedRoles ? { suggestedRoles: payload.suggestedRoles } : {}),
             updatedAt: new Date().toISOString(),
           };
         } else {
-          const text = (await file.text().catch(() => '')).replace(/\0/g, '').trim();
-          if (text.length < 25) {
+          const rawText = (await file.text().catch(() => '')).replace(/\0/g, '').trim();
+          const parsedDoc = parseClientResumeTextByFormat(rawText, resolvedMime);
+          const canonical = parsedDoc.canonicalText.trim();
+          if (canonical.length < 25) {
             throw new Error('The resume has too little readable text. Use at least 25 characters.');
           }
           currentSource = {
             schemaVersion: 1,
             filename: file.name,
-            mimeType: 'text/plain',
+            mimeType: resolvedMime,
             origin: 'upload',
-            text,
+            text: canonical,
+            ...(rawText !== canonical && rawText.length <= 500_000 ? { rawText } : {}),
+            parsedResume: parsedDoc,
+            suggestedRoles: parsedDoc.suggestedRoles,
             updatedAt: new Date().toISOString(),
           };
         }
@@ -644,12 +674,15 @@ export default function OnboardingFlow() {
         setSessionSource(currentSource);
         nextSelectedFile = { name: currentSource.filename, size: file.size };
       } else if (hasPaste) {
+        const parsedDoc = parseTextResume(trimmedPaste);
         currentSource = {
           schemaVersion: 1,
           filename: 'pasted-resume.txt',
           mimeType: 'text/plain',
           origin: 'upload',
           text: trimmedPaste,
+          parsedResume: parsedDoc,
+          suggestedRoles: parsedDoc.suggestedRoles,
           updatedAt: new Date().toISOString(),
         };
         writeSessionSourceResume(currentSource);
@@ -663,7 +696,17 @@ export default function OnboardingFlow() {
         }));
       }
 
-      const extractedHints = currentSource?.text ? applyExtractedProfileHints(currentSource.text) : undefined;
+      const hints = currentSource?.text
+        ? applyExtractedProfileHints(currentSource.text, currentSource.parsedResume)
+        : undefined;
+      const confidentRole =
+        hints?.suggestedRoles && hints.suggestedRoles.confidence >= 0.65
+          ? hints.suggestedRoles.primaryRole || hints.suggestedRoles.roles[0] || ''
+          : '';
+      const confidentRolesLine =
+        hints?.suggestedRoles && hints.suggestedRoles.confidence >= 0.65
+          ? hints.suggestedRoles.formatted
+          : '';
       const targetScreen: OnboardingScreen = destination === 'keep' ? 'result' : 'target';
 
       if (destination === 'keep') {
@@ -674,7 +717,7 @@ export default function OnboardingFlow() {
           analysis: null,
           answers: {},
           company: '',
-          targetRole: extractedHints?.headline || '',
+          targetRole: confidentRole,
           jobUrl: '',
           jobDescription: '',
           updatedAt: new Date().toISOString(),
@@ -707,11 +750,11 @@ export default function OnboardingFlow() {
             ...draft.profile,
             resumePath: 'upload',
             ...(clearedSourceResumeId ? { sourceResumeId: null } : {}),
-            ...(extractedHints?.headline && !draft.profile.preferences.roles
+            ...(confidentRolesLine && !draft.profile.preferences.roles
               ? {
                   preferences: {
                     ...draft.profile.preferences,
-                    roles: extractedHints.headline,
+                    roles: confidentRolesLine,
                   },
                 }
               : {}),
@@ -731,13 +774,19 @@ export default function OnboardingFlow() {
     if (busy) return;
     setError('');
     const sourceText = sessionSource?.text || '';
-    const extracted = applyExtractedProfileHints(sourceText);
+    const hints = applyExtractedProfileHints(sourceText, sessionSource?.parsedResume);
+    const confidentFormatted =
+      hints?.suggestedRoles && hints.suggestedRoles.confidence >= 0.65
+        ? hints.suggestedRoles.formatted
+        : '';
+    const confidentPrimary =
+      hints?.suggestedRoles && hints.suggestedRoles.confidence >= 0.65
+        ? hints.suggestedRoles.primaryRole || hints.suggestedRoles.roles[0] || ''
+        : '';
     const fallbackRole =
       wizardResult?.targetRole ||
       draft.wizardTarget.role.trim() ||
-      extracted?.headline ||
-      extracted?.skills?.slice(0, 3).join(', ') ||
-      '';
+      confidentFormatted;
     if (fallbackRole) setPortalRoles((prev) => prev || fallbackRole);
 
     const nextResult: WizardResumeResult = {
@@ -748,7 +797,7 @@ export default function OnboardingFlow() {
       analysisMode: wizardResult?.analysisMode,
       answers: wizardResult?.answers ?? {},
       company: wizardResult?.company ?? draft.wizardTarget.company.trim(),
-      targetRole: wizardResult?.targetRole || draft.wizardTarget.role.trim() || extracted?.headline || '',
+      targetRole: wizardResult?.targetRole || draft.wizardTarget.role.trim() || confidentPrimary,
       jobUrl: wizardResult?.jobUrl ?? draft.wizardTarget.jobUrl.trim(),
       jobDescription: wizardResult?.jobDescription ?? draft.wizardTarget.jobDescription.trim(),
       updatedAt: new Date().toISOString(),
@@ -939,11 +988,17 @@ export default function OnboardingFlow() {
       const stored = readSessionSourceResume();
       if (!uploadTarget && stored) {
         if (stored.pendingPdfBase64) {
-          uploadTarget = base64ToFile(stored.pendingPdfBase64, stored.filename, 'application/pdf');
-        } else if (stored.text.trim().length >= 25) {
-          uploadTarget = new File([stored.text], stored.filename.replace(/\.pdf$/i, '.txt') || 'resume.txt', {
-            type: 'text/plain',
-          });
+          uploadTarget = base64ToFile(stored.pendingPdfBase64, stored.filename, stored.mimeType || 'application/pdf');
+        } else {
+          const fallbackContent = (stored.rawText ?? stored.text).trim();
+          if (fallbackContent.length >= 25) {
+            const binaryFallback = isBinaryResumeMimeType(stored.mimeType);
+            uploadTarget = new File(
+              [fallbackContent],
+              binaryFallback ? stored.filename.replace(/\.(?:pdf|docx)$/i, '.txt') || 'resume.txt' : stored.filename,
+              { type: binaryFallback ? 'text/plain' : stored.mimeType || 'text/plain' },
+            );
+          }
         }
       }
       if (!uploadTarget) {
@@ -1101,7 +1156,7 @@ export default function OnboardingFlow() {
   );
   const isKeptResult = Boolean(wizardResult && (wizardResult.mode === 'kept' || !wizardResult.generatedResume));
   const keptFilename = sessionSource?.filename || draft.selectedFile?.name || 'Your uploaded resume';
-  const keptMimeLabel = sessionSource?.mimeType === 'application/pdf' ? 'PDF' : 'TXT';
+  const keptBadge = formatOriginalBadge(sessionSource?.mimeType || '', keptFilename);
 
   const backButton = (screen: OnboardingScreen) => (
     <button type="button" className="ob-back" disabled={busy} onClick={() => back(screen)}>
@@ -1242,7 +1297,7 @@ export default function OnboardingFlow() {
                     <Upload size={21} strokeWidth={1.6} />
                   </span>
                   <strong>Upload my resume</strong>
-                  <p>Bring a PDF, TXT, or pasted text. Keep your current resume as-is, or score fit and tailor a copy to a job description.</p>
+                  <p>Bring a PDF, DOCX, RTF, MD, TEX, or pasted text. Keep your current resume as-is, or score fit and tailor a copy to a job description.</p>
                   <span className="ob-choice-link">
                     Upload or paste text
                     <ArrowRight size={13} aria-hidden="true" />
@@ -1285,26 +1340,24 @@ export default function OnboardingFlow() {
               {title(
                 'YOUR RESUME',
                 'Upload your resume.',
-                'Upload a text-based PDF or TXT resume, or paste your resume text below. You can optionally tailor it to a job description next.',
+                `Upload a ${RESUME_FORMAT_SUMMARY} resume, or paste your resume text below. You can optionally tailor it to a job description next.`,
               )}
               <label className="ob-upload">
                 <Upload size={28} strokeWidth={1.4} aria-hidden="true" />
                 <strong>{file ? 'Choose a different resume file' : 'Drop your resume here, or browse'}</strong>
-                <span>Text-based PDF or TXT, up to 8 MB</span>
+                <span>{RESUME_FORMAT_SUMMARY}, up to 8 MB</span>
                 <input
                   aria-label="Resume file"
                   type="file"
-                  accept=".pdf,.txt,application/pdf,text/plain"
+                  accept={RESUME_FILE_ACCEPT}
                   disabled={busy}
                   onChange={(event) => {
                     const selected = event.target.files?.[0];
                     if (!selected) return;
-                    if (selected.size > 8 * 1024 * 1024) {
-                      setError('Choose a resume up to 8 MB.');
-                      return;
-                    }
-                    if (!/\.(pdf|txt)$/i.test(selected.name)) {
-                      setError('Choose a text-based PDF or TXT resume.');
+                    try {
+                      validateUpload(selected);
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : `Choose a ${RESUME_FORMAT_SUMMARY} resume.`);
                       return;
                     }
                     setError('');
@@ -1957,7 +2010,7 @@ export default function OnboardingFlow() {
                             Original file kept untouched. When you save to your portal, this exact resume is stored in your private library as your current resume without rewriting or reformatting.
                           </p>
                           <div className="ob-kept-meta">
-                            <span className="ob-kept-badge">{keptMimeLabel} original</span>
+                            <span className="ob-kept-badge">{keptBadge}</span>
                             {sessionSource?.text && (
                               <span className="ob-kept-badge">
                                 {sessionSource.text.length.toLocaleString()} characters ready

@@ -6,6 +6,12 @@ import { toast } from 'sonner';
 import ResumePreview from '@/components/ResumePreview';
 import type { StoredRecord } from '@/lib/tracker/types';
 import type { ResumeWorkspaceSummaryData, SourceResume } from '@/lib/resume-workspace/types';
+import {
+  inferResumeMimeType,
+  RESUME_FILE_ACCEPT,
+  RESUME_FORMAT_SUMMARY,
+  validateUpload,
+} from '@/lib/resume-parser/formats';
 import { fetchResumeLibrary, readableDate, resumeRequest } from './client';
 
 export default function ResumeLibrary({
@@ -60,8 +66,11 @@ export default function ResumeLibrary({
   }
 
   async function upload(file: File) {
-    if (file.size > 8 * 1024 * 1024) {
-      setError('Choose a resume up to 8 MB.');
+    let canonicalMime: string;
+    try {
+      canonicalMime = validateUpload(file);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Choose a ${RESUME_FORMAT_SUMMARY} resume up to 8 MB.`);
       return;
     }
     setUploading(true);
@@ -86,7 +95,7 @@ export default function ResumeLibrary({
       } else {
         const input = {
           filename: file.name,
-          mimeType: file.type || (file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'text/plain'),
+          mimeType: canonicalMime || inferResumeMimeType(file.name, file.type),
           size: file.size,
           sha256,
           idempotencyKey: uploadAttempt.current.key,
@@ -156,7 +165,7 @@ export default function ResumeLibrary({
               aria-label="Resume file"
               tabIndex={-1}
               type="file"
-              accept=".pdf,.txt,application/pdf,text/plain"
+              accept={RESUME_FILE_ACCEPT}
               className="sr-only"
               disabled={uploading}
               onChange={(event) => {
@@ -166,7 +175,7 @@ export default function ResumeLibrary({
             />
           </div>
         </div>
-        <p className="mt-3 text-xs text-slate-500">Text-based PDF or TXT · Up to 8 MB</p>
+        <p className="mt-3 text-xs text-slate-500">{RESUME_FORMAT_SUMMARY} · Up to 8 MB</p>
         {error && (
           <p role="alert" className="mt-4 text-sm text-red-700">
             {error}

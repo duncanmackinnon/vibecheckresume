@@ -1,4 +1,5 @@
 import type { Analysis, GeneratedResume, ResumeGenerationAnswers } from '@/app/types';
+import { SUPPORTED_RESUME_MIMES, type ParsedResumeDocument, type RoleSuggestion, type SupportedResumeMimeType } from '@/lib/resume-parser';
 import { createOnboardingProfile, type OnboardingProfileData } from './types';
 import { createStarterResumeAnswers, type StarterResumeAnswers } from './starter-resume';
 import { draftProfileSchema, unfinishedAnswersSchema } from './schemas';
@@ -31,10 +32,13 @@ export interface WizardResumeResult {
 export interface SessionSourceResume {
   schemaVersion: 1;
   filename: string;
-  mimeType: 'text/plain' | 'application/pdf';
+  mimeType: SupportedResumeMimeType;
   origin: 'builder' | 'upload';
   text: string;
+  rawText?: string;
   pendingPdfBase64?: string;
+  parsedResume?: ParsedResumeDocument;
+  suggestedRoles?: RoleSuggestion;
   generatedResume?: GeneratedResume;
   updatedAt: string;
 }
@@ -89,7 +93,13 @@ export function readSessionSourceResume(): SessionSourceResume | null {
     const raw = localStorage.getItem(SESSION_SOURCE_RESUME_KEY);
     if (!raw || raw.length > 4_000_000) return null;
     const data = JSON.parse(raw) as SessionSourceResume;
-    if (data?.schemaVersion !== 1 || typeof data.filename !== 'string' || !['text/plain', 'application/pdf'].includes(data.mimeType)) return null;
+    if (
+      data?.schemaVersion !== 1 ||
+      typeof data.filename !== 'string' ||
+      !SUPPORTED_RESUME_MIMES.includes(data.mimeType as SupportedResumeMimeType)
+    ) {
+      return null;
+    }
     return data;
   } catch { return null; }
 }

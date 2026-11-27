@@ -430,10 +430,13 @@ export async function POST(request: Request) {
       const formData = await request.formData();
       const uploaded = formData.get('file');
       if (!(uploaded instanceof File)) {
-        return Response.json({ error: 'Select a PDF or TXT resume file.' }, { status: 400, headers: NO_STORE });
+        return Response.json({ error: 'Select a PDF, DOCX, RTF, Markdown (.md), LaTeX (.tex), or TXT resume file.' }, { status: 400, headers: NO_STORE });
       }
-      const { mimeType, text } = await readUpload(uploaded);
-      return Response.json({ filename: uploaded.name, mimeType, size: uploaded.size, text }, { headers: NO_STORE });
+      const { mimeType, text, parsedResume, profile, suggestedRoles } = await readUpload(uploaded);
+      return Response.json(
+        { filename: uploaded.name, mimeType, size: uploaded.size, text, parsedResume, profile, suggestedRoles },
+        { headers: NO_STORE },
+      );
     } catch (error) {
       return Response.json(
         { error: error instanceof Error ? error.message : 'Your resume file could not be read.' },
